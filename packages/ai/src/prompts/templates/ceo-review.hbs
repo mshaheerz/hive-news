@@ -1,0 +1,43 @@
+Review the following article for publication in the {{category}} section.
+
+## Article Under Review
+
+**Title:** {{title}}
+**Summary:** {{summary}}
+
+{{#if duplicateScore}}
+## Duplicate Analysis
+Similarity score: {{duplicateScore}}%
+{{#if duplicateTitle}}Most similar existing article: "{{duplicateTitle}}"{{/if}}
+{{/if}}
+
+{{#if recentTitles}}
+## Recently Published Articles
+{{#each recentTitles}}
+- {{this}}
+{{/each}}
+{{/if}}
+
+## Article Content
+
+---
+{{{content}}}
+---
+
+## Review Rubric
+
+Score the article from 1-10 based on these criteria:
+
+1. **Writing Quality** (clarity, structure, grammar, flow)
+2. **Newsworthiness** (timeliness, relevance, impact)
+3. **Depth** (research quality, context, analysis)
+4. **Engagement** (readability, hook, compelling narrative)
+5. **Originality** (unique angle, not duplicating existing coverage)
+
+## Decision Guidelines
+
+- **7-10:** Approve for immediate publication
+- **4-6:** Request revision with specific, actionable feedback
+- **1-3:** Reject with clear explanation
+
+Provide your score, decision, and detailed editorial feedback.

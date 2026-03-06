@@ -1,0 +1,34 @@
+As Editor-in-Chief, select {{count}} compelling news topics for your reporters to cover.
+
+## Available Categories
+{{#each categories}}
+- {{this}}
+{{/each}}
+
+## Recently Published Articles
+{{#if recentTitles}}
+Avoid topics too similar to these recently published articles:
+{{#each recentTitles}}
+- {{this}}
+{{/each}}
+{{else}}
+No recent articles published yet. You have full freedom to choose any topics.
+{{/if}}
+
+## Requirements
+
+1. Select exactly {{count}} topics
+2. Spread topics across different categories for diversity
+3. Choose newsworthy, timely, and relevant subjects
+4. Avoid overlap with recently published articles
+5. For each topic, provide:
+   - A clear, specific topic description
+   - The target category
+   - A briefing for the assigned reporter explaining the angle and key points
+
+## Guidelines
+
+- Prioritize topics with broad appeal and reader interest
+- Include a mix of breaking news, analysis, and feature-style topics
+- Consider your audience's interests and the current news cycle
+- Each briefing should give the reporter enough direction to write a focused article
