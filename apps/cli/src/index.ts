@@ -3,11 +3,11 @@
 import { Command } from 'commander';
 import { registerInitCommand } from './commands/init';
 import { registerStartCommand } from './commands/start';
-import { registerCompanyCommand } from './commands/company';
-import { registerReporterCommand } from './commands/reporter';
-import { registerGenerateCommand } from './commands/generate';
-import { registerConfigCommand } from './commands/config';
-import { registerStatusCommand } from './commands/status';
+import { companyCommand } from './commands/company';
+import { reporterCommand } from './commands/reporter';
+import { generateCommand } from './commands/generate';
+import { configCommand } from './commands/config';
+import { statusCommand } from './commands/status';
 
 const program = new Command();
 
@@ -18,10 +18,10 @@ program
 
 registerInitCommand(program);
 registerStartCommand(program);
-registerCompanyCommand(program);
-registerReporterCommand(program);
-registerGenerateCommand(program);
-registerConfigCommand(program);
-registerStatusCommand(program);
+program.addCommand(companyCommand);
+program.addCommand(reporterCommand);
+program.addCommand(generateCommand);
+program.addCommand(configCommand);
+program.addCommand(statusCommand);
 
 program.parse(process.argv);

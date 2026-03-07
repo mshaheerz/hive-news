@@ -52,14 +52,14 @@ export function WorkflowToggle() {
           <div className="flex items-center gap-3">
             <div
               className={`w-3 h-3 rounded-full ${
-                running ? 'bg-green-400 animate-pulse' : 'bg-[var(--text-muted)]'
+                running ? 'bg-green-400 animate-pulse' : 'bg-(--text-muted)'
               }`}
             />
             <div>
-              <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+              <h3 className="text-sm font-semibold text-(--text-primary)">
                 Worker Status
               </h3>
-              <p className="text-xs text-[var(--text-muted)] font-mono">
+              <p className="text-xs text-(--text-muted) font-mono">
                 {running ? 'Running' : 'Stopped'} &middot; Mode: {MODES[mode].label}
               </p>
             </div>
@@ -103,7 +103,7 @@ export function WorkflowToggle() {
                   {config.label}
                 </h4>
               </div>
-              <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+              <p className="text-xs text-(--text-muted) leading-relaxed">
                 {config.description}
               </p>
             </button>
@@ -114,7 +114,7 @@ export function WorkflowToggle() {
       {/* Interval (only for scheduled mode) */}
       {mode === 'scheduled' && (
         <GlassCard glow="cyan">
-          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">
+          <h3 className="text-sm font-semibold text-(--text-primary) mb-3">
             Generation Interval
           </h3>
           <div className="flex items-center gap-4">
@@ -124,9 +124,9 @@ export function WorkflowToggle() {
               onChange={(e) => setInterval(Number(e.target.value))}
               min={30}
               step={30}
-              className="w-32 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-cyan)]/50"
+              className="w-32 bg-(--bg-primary) border border-(--border-primary) rounded-lg px-3 py-2 text-sm text-(--text-primary) font-mono focus:outline-none focus:border-(--accent-cyan)/50"
             />
-            <span className="text-xs text-[var(--text-muted)]">
+            <span className="text-xs text-(--text-muted)">
               seconds ({Math.floor(interval / 60)}m {interval % 60}s)
             </span>
           </div>

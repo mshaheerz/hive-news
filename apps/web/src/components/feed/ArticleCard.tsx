@@ -68,19 +68,19 @@ export function ArticleCard({ article }: ArticleCardProps) {
         </div>
 
         {/* Title */}
-        <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2 group-hover:text-[var(--accent-cyan)] transition-colors line-clamp-2">
+        <h2 className="text-lg font-semibold text-(--text-primary) mb-2 group-hover:text-(--accent-cyan) transition-colors line-clamp-2">
           {article.title}
         </h2>
 
         {/* Summary */}
-        <p className="text-sm text-[var(--text-muted)] line-clamp-3 mb-4 leading-relaxed">
+        <p className="text-sm text-(--text-muted) line-clamp-3 mb-4 leading-relaxed">
           {article.summary}
         </p>
 
         {/* Bottom row */}
         <div className="flex items-center justify-between">
           <ReporterBadge reporter={article.reporter} />
-          <span className="text-xs text-[var(--text-muted)] font-mono">
+          <span className="text-xs text-(--text-muted) font-mono">
             {getRelativeTime(article.publishedAt)}
           </span>
         </div>

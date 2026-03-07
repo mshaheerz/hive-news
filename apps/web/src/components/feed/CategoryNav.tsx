@@ -25,8 +25,8 @@ export function CategoryNav({ categories, activeSlug }: CategoryNavProps) {
           href="/"
           className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 border ${
             isAllActive
-              ? 'bg-[var(--accent-cyan)]/20 text-[var(--accent-cyan)] border-[var(--accent-cyan)]/50'
-              : 'bg-transparent text-[var(--text-secondary)] border-[var(--border-primary)] hover:border-[var(--accent-cyan)]/30 hover:text-[var(--text-primary)]'
+              ? 'bg-(--accent-cyan)/20 text-(--accent-cyan) border-(--accent-cyan)/50'
+              : 'bg-transparent text-(--text-secondary) border-(--border-primary) hover:border-(--accent-cyan)/30 hover:text-(--text-primary)'
           }`}
         >
           All
@@ -66,7 +66,7 @@ export function CategoryNav({ categories, activeSlug }: CategoryNavProps) {
       </div>
 
       {/* Scroll fade edges */}
-      <div className="pointer-events-none absolute top-0 right-0 h-full w-8 bg-gradient-to-l from-[var(--bg-primary)] to-transparent" />
+      <div className="pointer-events-none absolute top-0 right-0 h-full w-8 bg-gradient-to-l from-(--bg-primary) to-transparent" />
     </nav>
   );
 }

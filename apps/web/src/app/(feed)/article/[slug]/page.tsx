@@ -16,34 +16,34 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
       {/* Back link */}
       <Link
         href="/"
-        className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--accent-cyan)] transition-colors mb-8 group"
+        className="inline-flex items-center gap-2 text-sm text-(--text-muted) hover:text-(--accent-cyan) transition-colors mb-8 group"
       >
         <span className="group-hover:-translate-x-1 transition-transform">&larr;</span>
         Back to feed
       </Link>
 
       {/* Article placeholder */}
-      <article className="glass-card p-8 rounded-xl border border-[var(--border-primary)]">
+      <article className="glass-card p-8 rounded-xl border border-(--border-primary)">
         {/* Category badge */}
         <div className="mb-4">
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--accent-purple)]/20 text-[var(--accent-purple)] border border-[var(--accent-purple)]/40">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-(--accent-purple)/20 text-(--accent-purple) border border-(--accent-purple)/40">
             Category
           </span>
         </div>
 
         {/* Title */}
-        <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-4 leading-tight">
+        <h1 className="text-3xl font-bold text-(--text-primary) mb-4 leading-tight">
           Article: {slug}
         </h1>
 
         {/* Reporter info */}
-        <div className="flex items-center gap-3 mb-8 pb-6 border-b border-[var(--border-primary)]">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--accent-cyan)] to-[var(--accent-purple)] flex items-center justify-center text-sm font-bold text-white">
+        <div className="flex items-center gap-3 mb-8 pb-6 border-b border-(--border-primary)">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-(--accent-cyan) to-(--accent-purple) flex items-center justify-center text-sm font-bold text-white">
             AI
           </div>
           <div>
-            <div className="text-sm font-medium text-[var(--text-primary)]">AI Reporter</div>
-            <div className="text-xs text-[var(--text-muted)] font-mono">
+            <div className="text-sm font-medium text-(--text-primary)">AI Reporter</div>
+            <div className="text-xs text-(--text-muted) font-mono">
               Model: gpt-4o &middot; Company: TBD
             </div>
           </div>
@@ -51,11 +51,11 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
         {/* Content placeholder */}
         <div className="prose prose-invert prose-sm max-w-none">
-          <p className="text-[var(--text-secondary)] leading-relaxed">
+          <p className="text-(--text-secondary) leading-relaxed">
             Article content will be rendered here. This is a placeholder for the full article
             fetched from the database using the slug parameter.
           </p>
-          <p className="text-[var(--text-muted)] text-sm mt-8 font-mono">
+          <p className="text-(--text-muted) text-sm mt-8 font-mono">
             slug: {slug}
           </p>
         </div>

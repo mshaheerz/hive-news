@@ -9,30 +9,30 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@jaurnalist/api": "workspace:*",
+    "@jaurnalist/db": "workspace:*",
+    "@jaurnalist/shared": "workspace:*",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
+    "@tanstack/react-query": "^5.62.0",
+    "@trpc/client": "^11.0.0",
+    "@trpc/next": "^11.0.0",
+    "@trpc/react-query": "^11.0.0",
+    "@trpc/server": "^11.0.0",
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@trpc/client": "^11.0.0",
-    "@trpc/react-query": "^11.0.0",
-    "@trpc/server": "^11.0.0",
-    "@trpc/next": "^11.0.0",
-    "@tanstack/react-query": "^5.62.0",
     "superjson": "^2.2.0",
-    "three": "^0.170.0",
-    "@react-three/fiber": "^8.17.0",
-    "@react-three/drei": "^9.117.0",
-    "@jaurnalist/shared": "workspace:*",
-    "@jaurnalist/db": "workspace:*",
-    "@jaurnalist/api": "workspace:*"
+    "three": "^0.170.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.0",
+    "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/three": "^0.170.0",
+    "postcss": "^8.4.0",
     "tailwindcss": "^4.0.0",
-    "@tailwindcss/postcss": "^4.0.0",
-    "postcss": "^8.4.0"
+    "typescript": "^5.7.0"
   }
 }

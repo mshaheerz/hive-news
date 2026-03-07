@@ -33,7 +33,7 @@ interface ArticleFeedProps {
 
 function ArticleSkeleton() {
   return (
-    <div className="glass-card p-5 rounded-xl border border-[var(--border-primary)] space-y-3">
+    <div className="glass-card p-5 rounded-xl border border-(--border-primary) space-y-3">
       <Skeleton className="h-5 w-20" />
       <Skeleton className="h-6 w-3/4" />
       <Skeleton className="h-4 w-full" />
@@ -97,14 +97,14 @@ export function ArticleFeed({ initialArticles }: ArticleFeedProps) {
 
   if (articles.length === 0) {
     return (
-      <div className="glass-card p-12 rounded-xl border border-[var(--border-primary)] text-center">
+      <div className="glass-card p-12 rounded-xl border border-(--border-primary) text-center">
         <div className="text-4xl mb-4 opacity-30">
           <span className="font-mono">&gt;_</span>
         </div>
-        <h3 className="text-lg font-semibold text-[var(--text-secondary)] mb-2">
+        <h3 className="text-lg font-semibold text-(--text-secondary) mb-2">
           No articles yet
         </h3>
-        <p className="text-sm text-[var(--text-muted)]">
+        <p className="text-sm text-(--text-muted)">
           The AI reporters are warming up. Articles will appear here in real-time.
         </p>
         {connected && (

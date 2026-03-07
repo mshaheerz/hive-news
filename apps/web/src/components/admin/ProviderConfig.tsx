@@ -73,10 +73,10 @@ export function ProviderConfig() {
                 }`}
               />
               <div>
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                <h3 className="text-sm font-semibold text-(--text-primary)">
                   {provider.name}
                 </h3>
-                <p className="text-xs text-[var(--text-muted)] font-mono">
+                <p className="text-xs text-(--text-muted) font-mono">
                   {provider.type}
                   {provider.baseUrl ? ` - ${provider.baseUrl}` : ''}
                 </p>
@@ -95,7 +95,7 @@ export function ProviderConfig() {
               <button
                 onClick={() => handleTest(provider.id)}
                 disabled={testing === provider.id}
-                className="px-3 py-1 text-xs rounded-lg border border-[var(--border-primary)] text-[var(--text-secondary)] hover:text-[var(--accent-cyan)] hover:border-[var(--accent-cyan)]/50 transition-colors disabled:opacity-50"
+                className="px-3 py-1 text-xs rounded-lg border border-(--border-primary) text-(--text-secondary) hover:text-(--accent-cyan) hover:border-(--accent-cyan)/50 transition-colors disabled:opacity-50"
               >
                 {testing === provider.id ? 'Testing...' : 'Test'}
               </button>
@@ -113,8 +113,8 @@ export function ProviderConfig() {
       {providers.length === 0 && !showForm && (
         <GlassCard>
           <div className="text-center py-4">
-            <p className="text-[var(--text-muted)] text-sm mb-2">No providers configured</p>
-            <p className="text-[var(--text-muted)] text-xs">Add an AI provider to get started</p>
+            <p className="text-(--text-muted) text-sm mb-2">No providers configured</p>
+            <p className="text-(--text-muted) text-xs">Add an AI provider to get started</p>
           </div>
         </GlassCard>
       )}
@@ -122,14 +122,14 @@ export function ProviderConfig() {
       {/* Add form */}
       {showForm ? (
         <GlassCard glow="cyan">
-          <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Add Provider</h3>
+          <h3 className="text-sm font-semibold text-(--text-primary) mb-4">Add Provider</h3>
           <div className="space-y-4">
             <div>
-              <label className="block text-xs text-[var(--text-muted)] mb-1 font-mono">Type</label>
+              <label className="block text-xs text-(--text-muted) mb-1 font-mono">Type</label>
               <select
                 value={formType}
                 onChange={(e) => setFormType(e.target.value as Provider['type'])}
-                className="w-full bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-cyan)]/50"
+                className="w-full bg-(--bg-primary) border border-(--border-primary) rounded-lg px-3 py-2 text-sm text-(--text-primary) focus:outline-none focus:border-(--accent-cyan)/50"
               >
                 {PROVIDER_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
@@ -138,25 +138,25 @@ export function ProviderConfig() {
             </div>
 
             <div>
-              <label className="block text-xs text-[var(--text-muted)] mb-1 font-mono">API Key</label>
+              <label className="block text-xs text-(--text-muted) mb-1 font-mono">API Key</label>
               <input
                 type="password"
                 value={formApiKey}
                 onChange={(e) => setFormApiKey(e.target.value)}
                 placeholder="sk-..."
-                className="w-full bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-cyan)]/50"
+                className="w-full bg-(--bg-primary) border border-(--border-primary) rounded-lg px-3 py-2 text-sm text-(--text-primary) font-mono focus:outline-none focus:border-(--accent-cyan)/50"
               />
             </div>
 
             {formType === 'ollama' && (
               <div>
-                <label className="block text-xs text-[var(--text-muted)] mb-1 font-mono">Base URL</label>
+                <label className="block text-xs text-(--text-muted) mb-1 font-mono">Base URL</label>
                 <input
                   type="text"
                   value={formBaseUrl}
                   onChange={(e) => setFormBaseUrl(e.target.value)}
                   placeholder="http://localhost:11434"
-                  className="w-full bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-cyan)]/50"
+                  className="w-full bg-(--bg-primary) border border-(--border-primary) rounded-lg px-3 py-2 text-sm text-(--text-primary) font-mono focus:outline-none focus:border-(--accent-cyan)/50"
                 />
               </div>
             )}
@@ -164,13 +164,13 @@ export function ProviderConfig() {
             <div className="flex gap-2">
               <button
                 onClick={handleAdd}
-                className="px-4 py-2 text-sm rounded-lg bg-[var(--accent-cyan)]/20 text-[var(--accent-cyan)] border border-[var(--accent-cyan)]/40 hover:bg-[var(--accent-cyan)]/30 transition-colors"
+                className="px-4 py-2 text-sm rounded-lg bg-(--accent-cyan)/20 text-(--accent-cyan) border border-(--accent-cyan)/40 hover:bg-(--accent-cyan)/30 transition-colors"
               >
                 Add Provider
               </button>
               <button
                 onClick={() => setShowForm(false)}
-                className="px-4 py-2 text-sm rounded-lg border border-[var(--border-primary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                className="px-4 py-2 text-sm rounded-lg border border-(--border-primary) text-(--text-muted) hover:text-(--text-primary) transition-colors"
               >
                 Cancel
               </button>
@@ -180,7 +180,7 @@ export function ProviderConfig() {
       ) : (
         <button
           onClick={() => setShowForm(true)}
-          className="w-full py-3 rounded-xl border border-dashed border-[var(--border-primary)] text-sm text-[var(--text-muted)] hover:text-[var(--accent-cyan)] hover:border-[var(--accent-cyan)]/40 transition-colors"
+          className="w-full py-3 rounded-xl border border-dashed border-(--border-primary) text-sm text-(--text-muted) hover:text-(--accent-cyan) hover:border-(--accent-cyan)/40 transition-colors"
         >
           + Add Provider
         </button>

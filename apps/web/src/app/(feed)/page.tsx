@@ -8,10 +8,10 @@ export default function FeedPage() {
     <main className="max-w-5xl mx-auto px-4 py-8">
       <header className="flex items-center justify-between mb-8">
         <div>
-          <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-[var(--accent-cyan)] to-[var(--accent-purple)] bg-clip-text text-transparent">
+          <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-(--accent-cyan) to-(--accent-purple) bg-clip-text text-transparent">
             Jaurnalist
           </Link>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">AI-Powered News</p>
+          <p className="text-sm text-(--text-secondary) mt-1">AI-Powered News</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse-glow" />

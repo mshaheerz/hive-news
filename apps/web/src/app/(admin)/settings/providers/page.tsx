@@ -7,12 +7,12 @@ export default function ProvidersPage() {
       <header className="mb-8">
         <Link
           href="/dashboard"
-          className="text-xs text-[var(--text-muted)] hover:text-[var(--accent-cyan)] transition-colors font-mono mb-2 inline-block"
+          className="text-xs text-(--text-muted) hover:text-(--accent-cyan) transition-colors font-mono mb-2 inline-block"
         >
           &larr; Dashboard
         </Link>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">AI Providers</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-1">
+        <h1 className="text-2xl font-bold text-(--text-primary)">AI Providers</h1>
+        <p className="text-sm text-(--text-muted) mt-1">
           Configure the AI model providers used by your reporters
         </p>
       </header>
