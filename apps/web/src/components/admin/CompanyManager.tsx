@@ -2,69 +2,74 @@
 
 import { useState } from 'react';
 import { GlassCard } from '@/components/ui/GlassCard';
-
-interface Company {
-  id: string;
-  name: string;
-  description: string;
-  ceoName: string;
-}
+import { trpc } from '@/lib/trpc/client';
 
 export function CompanyManager() {
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const utils = trpc.useUtils();
+  const { data: companies = [], isLoading } = trpc.companies.list.useQuery();
+  const createMutation = trpc.companies.create.useMutation({
+    onSuccess: () => utils.companies.list.invalidate(),
+  });
+  const updateMutation = trpc.companies.update.useMutation({
+    onSuccess: () => utils.companies.list.invalidate(),
+  });
+  const deleteMutation = trpc.companies.delete.useMutation({
+    onSuccess: () => utils.companies.list.invalidate(),
+  });
+
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
-  const [formCeo, setFormCeo] = useState('');
 
   const resetForm = () => {
     setFormName('');
     setFormDescription('');
-    setFormCeo('');
     setShowForm(false);
     setEditingId(null);
   };
 
   const handleSubmit = async () => {
+    const slug = formName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     if (editingId) {
-      // TODO: Update via API
-      setCompanies((prev) =>
-        prev.map((c) =>
-          c.id === editingId
-            ? { ...c, name: formName, description: formDescription, ceoName: formCeo }
-            : c
-        )
-      );
-    } else {
-      const newCompany: Company = {
-        id: crypto.randomUUID(),
+      await updateMutation.mutateAsync({
+        id: editingId,
         name: formName,
-        description: formDescription,
-        ceoName: formCeo,
-      };
-      // TODO: Save via API
-      setCompanies((prev) => [...prev, newCompany]);
+        description: formDescription || undefined,
+      });
+    } else {
+      await createMutation.mutateAsync({
+        name: formName,
+        slug,
+        description: formDescription || undefined,
+      });
     }
     resetForm();
   };
 
-  const handleEdit = (company: Company) => {
+  const handleEdit = (company: { id: string; name: string; description: string | null }) => {
     setFormName(company.name);
-    setFormDescription(company.description);
-    setFormCeo(company.ceoName);
+    setFormDescription(company.description ?? '');
     setEditingId(company.id);
     setShowForm(true);
   };
 
   const handleDelete = (id: string) => {
-    // TODO: Delete via API
-    setCompanies((prev) => prev.filter((c) => c.id !== id));
+    deleteMutation.mutate({ id });
   };
+
+  if (isLoading) {
+    return (
+      <GlassCard>
+        <div className="text-center py-4">
+          <p className="text-(--text-muted) text-sm">Loading companies...</p>
+        </div>
+      </GlassCard>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Company list */}
       {companies.map((company) => (
         <GlassCard key={company.id}>
           <div className="flex items-start justify-between">
@@ -72,7 +77,7 @@ export function CompanyManager() {
               <h3 className="text-sm font-semibold text-(--text-primary)">{company.name}</h3>
               <p className="text-xs text-(--text-muted) mt-1">{company.description}</p>
               <p className="text-xs text-(--text-secondary) mt-2 font-mono">
-                CEO: {company.ceoName}
+                {company.slug} &middot; {company.isActive ? 'Active' : 'Inactive'}
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -102,7 +107,6 @@ export function CompanyManager() {
         </GlassCard>
       )}
 
-      {/* Add / Edit form */}
       {showForm ? (
         <GlassCard glow="purple">
           <h3 className="text-sm font-semibold text-(--text-primary) mb-4">
@@ -131,21 +135,11 @@ export function CompanyManager() {
               />
             </div>
 
-            <div>
-              <label className="block text-xs text-(--text-muted) mb-1 font-mono">CEO Reporter</label>
-              <input
-                type="text"
-                value={formCeo}
-                onChange={(e) => setFormCeo(e.target.value)}
-                placeholder="CEO reporter name"
-                className="w-full bg-(--bg-primary) border border-(--border-primary) rounded-lg px-3 py-2 text-sm text-(--text-primary) font-mono focus:outline-none focus:border-(--accent-purple)/50"
-              />
-            </div>
-
             <div className="flex gap-2">
               <button
                 onClick={handleSubmit}
-                className="px-4 py-2 text-sm rounded-lg bg-(--accent-purple)/20 text-(--accent-purple) border border-(--accent-purple)/40 hover:bg-(--accent-purple)/30 transition-colors"
+                disabled={createMutation.isPending || updateMutation.isPending}
+                className="px-4 py-2 text-sm rounded-lg bg-(--accent-purple)/20 text-(--accent-purple) border border-(--accent-purple)/40 hover:bg-(--accent-purple)/30 transition-colors disabled:opacity-50"
               >
                 {editingId ? 'Update' : 'Add Company'}
               </button>

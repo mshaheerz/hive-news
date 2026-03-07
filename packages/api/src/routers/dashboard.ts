@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import { eq, sql, and, gte } from 'drizzle-orm';
+import { eq, sql, and, gte, desc } from 'drizzle-orm';
 import { router, publicProcedure } from '../trpc';
-import { articles, reporters, companies, generationLogs } from '@jaurnalist/db/schema';
+import { articles, reporters, companies, reviewLogs } from '@jaurnalist/db/schema';
+import { workflowLogs } from '@jaurnalist/db/schema';
 
 export const dashboardRouter = router({
   stats: publicProcedure
@@ -29,9 +30,10 @@ export const dashboardRouter = router({
             published: sql<number>`count(*) filter (where ${articles.status} = 'published')`,
             draft: sql<number>`count(*) filter (where ${articles.status} = 'draft')`,
             rejected: sql<number>`count(*) filter (where ${articles.status} = 'rejected')`,
-            failed: sql<number>`count(*) filter (where ${articles.status} = 'failed')`,
-            totalTokens: sql<number>`coalesce(sum(${articles.tokenCount}), 0)`,
-            avgTokens: sql<number>`coalesce(avg(${articles.tokenCount}), 0)`,
+            inReview: sql<number>`count(*) filter (where ${articles.status} = 'in_review')`,
+            approved: sql<number>`count(*) filter (where ${articles.status} = 'approved')`,
+            totalTokens: sql<number>`coalesce(sum(${articles.tokensUsed}), 0)`,
+            avgTokens: sql<number>`coalesce(avg(${articles.tokensUsed}), 0)`,
           })
           .from(articles)
           .where(articleWhere),
@@ -54,9 +56,10 @@ export const dashboardRouter = router({
         articles: articleStats[0] ?? {
           total: 0,
           published: 0,
+          approved: 0,
           draft: 0,
           rejected: 0,
-          failed: 0,
+          inReview: 0,
           totalTokens: 0,
           avgTokens: 0,
         },
@@ -65,30 +68,94 @@ export const dashboardRouter = router({
       };
     }),
 
-  agentStatus: publicProcedure.query(async ({ ctx }) => {
-    // Check for recent generation activity (within last 5 minutes)
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-
-    const activeGenerations = await ctx.db
-      .select({
-        id: generationLogs.id,
-        companyId: generationLogs.companyId,
-        status: generationLogs.status,
-        startedAt: generationLogs.startedAt,
-        articlesGenerated: generationLogs.articlesGenerated,
-      })
-      .from(generationLogs)
-      .where(
-        and(
-          eq(generationLogs.status, 'running'),
-          gte(generationLogs.startedAt, fiveMinutesAgo),
-        ),
-      )
-      .orderBy(generationLogs.startedAt);
-
+  agentStatus: publicProcedure.query(async () => {
+    // TODO: Implement when generation_logs table is added
     return {
-      isGenerating: activeGenerations.length > 0,
-      activeGenerations,
+      isGenerating: false,
+      activeGenerations: [],
     };
   }),
+
+  logs: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(20).default(8),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const entries = await ctx.db
+        .select({
+          id: workflowLogs.id,
+          event: workflowLogs.event,
+          message: workflowLogs.message,
+          metadata: workflowLogs.metadata,
+          createdAt: workflowLogs.createdAt,
+          companyId: workflowLogs.companyId,
+          reporterId: workflowLogs.reporterId,
+          companyName: companies.name,
+          reporterName: reporters.journalistName,
+        })
+        .from(workflowLogs)
+        .leftJoin(companies, eq(workflowLogs.companyId, companies.id))
+        .leftJoin(reporters, eq(workflowLogs.reporterId, reporters.id))
+        .orderBy(desc(workflowLogs.createdAt))
+        .limit(input.limit);
+
+      return entries.map((entry) => ({
+        id: entry.id,
+        event: entry.event,
+        message: entry.message,
+        metadata: entry.metadata ?? null,
+        createdAt: entry.createdAt,
+        companyId: entry.companyId,
+        companyName: entry.companyName ?? 'Unknown',
+        reporterId: entry.reporterId ?? undefined,
+        reporterName: entry.reporterName ?? undefined,
+      }));
+    }),
+
+  reviewLogs: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(20).default(6),
+        action: z.enum(['approved', 'rejected', 'revision_requested', 'flagged_duplicate']).optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const actionCondition = input.action ? eq(reviewLogs.action, input.action) : undefined;
+
+      const rows = await ctx.db
+        .select({
+          id: reviewLogs.id,
+          action: reviewLogs.action,
+          feedback: reviewLogs.feedback,
+          score: reviewLogs.score,
+          isDuplicate: reviewLogs.isDuplicate,
+          createdAt: reviewLogs.createdAt,
+          articleId: reviewLogs.articleId,
+          articleTitle: articles.title,
+          reviewerName: reporters.journalistName,
+          companyName: companies.name,
+        })
+        .from(reviewLogs)
+        .leftJoin(articles, eq(reviewLogs.articleId, articles.id))
+        .leftJoin(reporters, eq(reviewLogs.reviewerId, reporters.id))
+        .leftJoin(companies, eq(articles.companyId, companies.id))
+        .where(actionCondition)
+        .orderBy(desc(reviewLogs.createdAt))
+        .limit(input.limit);
+
+      return rows.map((row) => ({
+        id: row.id,
+        action: row.action,
+        feedback: row.feedback ?? null,
+        score: row.score ?? null,
+        isDuplicate: row.isDuplicate,
+        createdAt: row.createdAt,
+        articleId: row.articleId,
+        articleTitle: row.articleTitle ?? 'Untitled',
+        reviewerName: row.reviewerName ?? 'CEO',
+        companyName: row.companyName ?? 'Unknown',
+      }));
+    }),
 });

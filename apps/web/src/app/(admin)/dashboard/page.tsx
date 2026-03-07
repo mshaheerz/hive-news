@@ -3,6 +3,8 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
+import { trpc } from '@/lib/trpc/client';
+
 const AgentFlowViz = dynamic(() => import('@/components/three/AgentFlowViz').then((m) => m.AgentFlowViz), {
   ssr: false,
   loading: () => (
@@ -22,13 +24,25 @@ function StatCard({ label, value, color }: { label: string; value: string | numb
 }
 
 export default function DashboardPage() {
-  // TODO: Fetch real stats from DB
+  const { data } = trpc.dashboard.stats.useQuery();
+  const { data: logsData = [], isLoading: logsLoading } = trpc.dashboard.logs.useQuery({ limit: 8 });
+  const { data: reviewEntries = [], isLoading: reviewLoading } = trpc.dashboard.reviewLogs.useQuery({
+    limit: 5,
+    action: 'rejected',
+  });
+
   const stats = {
-    totalArticles: 0,
-    activeReporters: 0,
-    companies: 0,
-    tokensUsed: 0,
+    totalArticles: data?.articles.total ?? 0,
+    publishedArticles: data?.articles.published ?? 0,
+    approvedArticles: data?.articles.approved ?? 0,
+    activeReporters: data?.reporters.active ?? 0,
+    companies: data?.companies.total ?? 0,
+    tokensUsed: data?.articles.totalTokens ?? 0,
   };
+
+  const logEntries = logsData;
+  const formatTimestamp = (value?: string) =>
+    value ? new Date(value).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
 
   return (
     <main className="max-w-6xl mx-auto px-4 py-8">
@@ -46,10 +60,12 @@ export default function DashboardPage() {
       </header>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
         <StatCard label="Total Articles" value={stats.totalArticles} color="var(--accent-cyan)" />
+        <StatCard label="Published" value={stats.publishedArticles} color="#22c55e" />
+        <StatCard label="Approved" value={stats.approvedArticles} color="var(--accent-purple)" />
         <StatCard label="Active Reporters" value={stats.activeReporters} color="var(--accent-purple)" />
-        <StatCard label="Companies" value={stats.companies} color="#22c55e" />
+        <StatCard label="Companies" value={stats.companies} color="#0ea5e9" />
         <StatCard label="Tokens Used" value={stats.tokensUsed.toLocaleString()} color="#f59e0b" />
       </div>
 
@@ -81,6 +97,89 @@ export default function DashboardPage() {
         </div>
       </section>
 
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-lg font-semibold text-(--text-primary)">Workflow Activity</h2>
+            <p className="text-xs text-(--text-muted)">Live logs from the worker</p>
+          </div>
+          <span className="text-xs text-(--text-muted)">
+            {logsLoading ? 'Loading…' : `${logEntries.length} entries`}
+          </span>
+        </div>
+          <div className="glass-card p-4 rounded-xl border border-(--border-primary)">
+            {logsLoading ? (
+              <p className="text-sm text-(--text-muted)">Loading events…</p>
+            ) : logEntries.length === 0 ? (
+              <p className="text-sm text-(--text-muted)">No workflow activity recorded yet</p>
+            ) : (
+            <div className="space-y-3">
+              {logEntries.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="rounded-xl border border-(--border-primary) bg-(--bg-secondary)/40 px-4 py-3"
+                >
+                  <div className="flex items-center justify-between text-xs text-(--text-muted)">
+                    <span>
+                      {entry.companyName}
+                      {entry.reporterName ? ` · ${entry.reporterName}` : ''}
+                    </span>
+                    <span>{formatTimestamp(entry.createdAt)}</span>
+                  </div>
+                  <p className="text-sm font-medium text-(--text-secondary) mt-1">{entry.message}</p>
+                  <div className="flex flex-wrap gap-2 mt-2 text-[11px] text-(--text-muted)">
+                    <span className="rounded-full bg-(--border-primary)/40 px-2 py-1">{entry.event}</span>
+                    {entry.metadata &&
+                      Object.entries(entry.metadata).map(([key, value]) => (
+                        <span key={key}>{`${key}: ${String(value)}`}</span>
+                      ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-lg font-semibold text-(--text-primary)">Review Rejections</h2>
+            <p className="text-xs text-(--text-muted)">Latest CEO rejection decisions</p>
+          </div>
+          <span className="text-xs text-(--text-muted)">
+            {reviewLoading ? 'Loading…' : `${reviewEntries.length} entries`}
+          </span>
+        </div>
+        <div className="glass-card p-4 rounded-xl border border-(--border-primary)">
+          {reviewLoading ? (
+            <p className="text-sm text-(--text-muted)">Loading review logs…</p>
+          ) : reviewEntries.length === 0 ? (
+            <p className="text-sm text-(--text-muted)">No review rejections yet</p>
+          ) : (
+            <div className="space-y-3">
+              {reviewEntries.map((entry) => (
+                <div key={entry.id} className="rounded-xl border border-(--border-primary) bg-(--bg-secondary)/40 px-4 py-3">
+                  <div className="flex items-center justify-between text-xs text-(--text-muted)">
+                    <span>
+                      {entry.articleTitle} · {entry.companyName}
+                    </span>
+                    <span>{new Date(entry.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                  <p className="text-sm font-semibold text-red-400 mt-1">Rejected by {entry.reviewerName}</p>
+                  <p className="text-sm text-(--text-muted) mt-2">
+                    {entry.feedback ?? 'No feedback provided'}
+                  </p>
+                  {entry.score != null && (
+                    <p className="text-[11px] text-(--text-muted) mt-2">Score: {entry.score}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* Recent articles */}
       <section>
         <h2 className="text-lg font-semibold text-(--text-primary) mb-4">Recent Articles</h2>
@@ -100,6 +199,7 @@ export default function DashboardPage() {
             { label: 'AI Providers', href: '/settings/providers', color: 'var(--accent-cyan)' },
             { label: 'Companies', href: '/settings/companies', color: 'var(--accent-purple)' },
             { label: 'Reporters', href: '/settings/reporters', color: '#22c55e' },
+            { label: 'Categories', href: '/settings/categories', color: '#fb923c' },
             { label: 'Workflow', href: '/settings/workflow', color: '#f59e0b' },
           ].map((item) => (
             <Link

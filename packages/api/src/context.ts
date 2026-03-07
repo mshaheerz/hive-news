@@ -1,6 +1,6 @@
-import type { db } from '@jaurnalist/db';
+import type { createDb } from '@jaurnalist/db';
 
-export type Database = typeof db;
+export type Database = ReturnType<typeof createDb>;
 
 export interface Context {
   db: Database;

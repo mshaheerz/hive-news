@@ -12,6 +12,7 @@
     "@jaurnalist/api": "workspace:*",
     "@jaurnalist/db": "workspace:*",
     "@jaurnalist/shared": "workspace:*",
+    "drizzle-orm": "^0.45.1",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "@tanstack/react-query": "^5.62.0",

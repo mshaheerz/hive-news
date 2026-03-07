@@ -4,23 +4,25 @@
   "private": true,
   "main": "./src/index.ts",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --env-file=../../.env src/index.ts",
     "build": "tsup src/index.ts --format esm --dts",
     "start": "node dist/index.js",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "bullmq": "^5.34.0",
-    "ioredis": "^5.4.0",
-    "node-cron": "^3.0.3",
-    "@jaurnalist/shared": "workspace:*",
+    "@jaurnalist/ai": "workspace:*",
     "@jaurnalist/db": "workspace:*",
-    "@jaurnalist/ai": "workspace:*"
+    "@jaurnalist/shared": "workspace:*",
+    "bullmq": "^5.34.0",
+    "dotenv": "^17.3.1",
+    "drizzle-orm": "^0.45.1",
+    "ioredis": "^5.4.0",
+    "node-cron": "^3.0.3"
   },
   "devDependencies": {
-    "tsx": "^4.19.0",
+    "@types/node-cron": "^3.0.11",
     "tsup": "^8.3.0",
-    "typescript": "^5.7.0",
-    "@types/node-cron": "^3.0.11"
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
   }
 }

@@ -7,3 +7,4 @@ export * from './review-logs';
 export * from './api-tokens';
 export * from './settings';
 export * from './federation-instances';
+export * from './workflow-logs';

@@ -6,7 +6,7 @@
     "jaurnalist": "./dist/index.js"
   },
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "echo 'CLI does not run in dev mode. Use: pnpm jaurnalist <command>'",
     "build": "tsup src/index.ts --format esm --dts --shims",
     "lint": "tsc --noEmit"
   },

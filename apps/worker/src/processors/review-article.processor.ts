@@ -1,9 +1,9 @@
 import { eq, and, desc } from 'drizzle-orm';
 import type { ProviderRegistry } from '@jaurnalist/ai/src/providers/registry';
 import { CEOAgent } from '@jaurnalist/ai/src/agents/ceo-agent';
-import { articles } from '@jaurnalist/db/src/schema/articles';
-import { reporters } from '@jaurnalist/db/src/schema/reporters';
-import { reviewLogs } from '@jaurnalist/db/src/schema/review-logs';
+import { articles } from '@jaurnalist/db/schema';
+import { reporters } from '@jaurnalist/db/schema';
+import { reviewLogs } from '@jaurnalist/db/schema';
 import type { CeoReviewJobData } from '../queues/ceo-review.queue';
 import type { ReviewAction } from '@jaurnalist/shared';
 

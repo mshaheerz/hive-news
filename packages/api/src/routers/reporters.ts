@@ -23,7 +23,7 @@ export const reportersRouter = router({
         .select()
         .from(reporters)
         .where(where)
-        .orderBy(reporters.name);
+        .orderBy(reporters.journalistName);
     }),
 
   getById: publicProcedure
@@ -52,8 +52,8 @@ export const reportersRouter = router({
       const stats = await ctx.db
         .select({
           articleCount: sql<number>`count(*)`,
-          avgTokens: sql<number>`coalesce(avg(${articles.tokenCount}), 0)`,
-          totalTokens: sql<number>`coalesce(sum(${articles.tokenCount}), 0)`,
+          avgTokens: sql<number>`coalesce(avg(${articles.tokensUsed}), 0)`,
+          totalTokens: sql<number>`coalesce(sum(${articles.tokensUsed}), 0)`,
           publishedCount: sql<number>`count(*) filter (where ${articles.status} = 'published')`,
           rejectedCount: sql<number>`count(*) filter (where ${articles.status} = 'rejected')`,
         })
@@ -75,30 +75,32 @@ export const reportersRouter = router({
   create: publicProcedure
     .input(
       z.object({
-        name: z.string().min(1).max(255),
-        slug: z.string().min(1).max(255),
+        journalistName: z.string().min(1).max(200),
         companyId: z.string().uuid(),
-        providerId: z.string().uuid().optional(),
-        modelId: z.string().optional(),
-        systemPrompt: z.string().optional(),
-        categories: z.array(z.string()).default([]),
-        persona: z.record(z.unknown()).default({}),
+        providerId: z.string().uuid(),
+        modelId: z.string().min(1).max(100),
+        role: z.enum(['ceo', 'reporter']),
+        personaPrompt: z.string().optional(),
+        categories: z.array(z.string()).optional(),
         isActive: z.boolean().default(true),
+        avatarUrl: z.string().optional(),
+        bio: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const result = await ctx.db
         .insert(reporters)
         .values({
-          name: input.name,
-          slug: input.slug,
+          journalistName: input.journalistName,
           companyId: input.companyId,
           providerId: input.providerId,
           modelId: input.modelId,
-          systemPrompt: input.systemPrompt,
+          role: input.role,
+          personaPrompt: input.personaPrompt,
           categories: input.categories,
-          persona: input.persona,
           isActive: input.isActive,
+          avatarUrl: input.avatarUrl,
+          bio: input.bio,
         })
         .returning();
 
@@ -109,14 +111,15 @@ export const reportersRouter = router({
     .input(
       z.object({
         id: z.string().uuid(),
-        name: z.string().min(1).max(255).optional(),
-        slug: z.string().min(1).max(255).optional(),
+        journalistName: z.string().min(1).max(200).optional(),
         providerId: z.string().uuid().optional(),
         modelId: z.string().optional(),
-        systemPrompt: z.string().optional(),
+        role: z.enum(['ceo', 'reporter']).optional(),
+        personaPrompt: z.string().optional(),
         categories: z.array(z.string()).optional(),
-        persona: z.record(z.unknown()).optional(),
         isActive: z.boolean().optional(),
+        avatarUrl: z.string().optional(),
+        bio: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -124,7 +127,7 @@ export const reportersRouter = router({
 
       const result = await ctx.db
         .update(reporters)
-        .set({ ...updates, updatedAt: new Date() })
+        .set(updates as any)
         .where(eq(reporters.id, id))
         .returning();
 

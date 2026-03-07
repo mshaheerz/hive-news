@@ -2,74 +2,80 @@
 
 import { useState } from 'react';
 import { GlassCard } from '@/components/ui/GlassCard';
-
-interface Provider {
-  id: string;
-  name: string;
-  type: 'openai' | 'anthropic' | 'google' | 'ollama' | 'openrouter';
-  apiKey: string;
-  baseUrl?: string;
-  connected: boolean;
-}
+import { trpc } from '@/lib/trpc/client';
 
 const PROVIDER_TYPES = [
   { value: 'openai', label: 'OpenAI' },
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'google', label: 'Google AI' },
+  { value: 'groq', label: 'Groq' },
   { value: 'ollama', label: 'Ollama (Local)' },
   { value: 'openrouter', label: 'OpenRouter' },
 ] as const;
 
+type ProviderType = (typeof PROVIDER_TYPES)[number]['value'];
+
 export function ProviderConfig() {
-  const [providers, setProviders] = useState<Provider[]>([]);
+  const utils = trpc.useUtils();
+  const { data: providers = [], isLoading } = trpc.providers.list.useQuery();
+  const createMutation = trpc.providers.create.useMutation({
+    onSuccess: () => utils.providers.list.invalidate(),
+  });
+  const deleteMutation = trpc.providers.delete.useMutation({
+    onSuccess: () => utils.providers.list.invalidate(),
+  });
+  const testMutation = trpc.providers.testConnection.useMutation();
+
   const [showForm, setShowForm] = useState(false);
-  const [formType, setFormType] = useState<Provider['type']>('openai');
+  const [formType, setFormType] = useState<ProviderType>('openai');
   const [formApiKey, setFormApiKey] = useState('');
   const [formBaseUrl, setFormBaseUrl] = useState('');
-  const [testing, setTesting] = useState<string | null>(null);
+  const [testedIds, setTestedIds] = useState<Set<string>>(new Set());
 
   const handleAdd = async () => {
-    const newProvider: Provider = {
-      id: crypto.randomUUID(),
-      name: PROVIDER_TYPES.find((t) => t.value === formType)?.label ?? formType,
+    const label = PROVIDER_TYPES.find((t) => t.value === formType)?.label ?? formType;
+    await createMutation.mutateAsync({
+      name: label,
       type: formType,
-      apiKey: formApiKey,
+      apiKeyEnc: formApiKey || undefined,
       baseUrl: formBaseUrl || undefined,
-      connected: false,
-    };
-
-    // TODO: Save to DB via API
-    setProviders((prev) => [...prev, newProvider]);
+      isLocal: formType === 'ollama',
+    });
     setShowForm(false);
     setFormApiKey('');
     setFormBaseUrl('');
   };
 
   const handleTest = async (id: string) => {
-    setTesting(id);
-    // TODO: Call API to test connection
-    await new Promise((r) => setTimeout(r, 1500));
-    setProviders((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, connected: true } : p))
-    );
-    setTesting(null);
+    const result = await testMutation.mutateAsync({ id });
+    if (result.success) {
+      setTestedIds((prev) => new Set(prev).add(id));
+    }
   };
 
   const handleDelete = (id: string) => {
-    // TODO: Delete from DB via API
-    setProviders((prev) => prev.filter((p) => p.id !== id));
+    deleteMutation.mutate({ id });
   };
+
+  if (isLoading) {
+    return (
+      <GlassCard>
+        <div className="text-center py-4">
+          <p className="text-(--text-muted) text-sm">Loading providers...</p>
+        </div>
+      </GlassCard>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Provider list */}
       {providers.map((provider) => (
         <GlassCard key={provider.id}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div
                 className={`w-3 h-3 rounded-full ${
-                  provider.connected ? 'bg-green-400' : 'bg-red-400'
+                  testedIds.has(provider.id) ? 'bg-green-400' : 'bg-yellow-400'
                 }`}
               />
               <div>
@@ -83,21 +89,12 @@ export function ProviderConfig() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full font-mono ${
-                  provider.connected
-                    ? 'bg-green-400/10 text-green-400 border border-green-400/30'
-                    : 'bg-red-400/10 text-red-400 border border-red-400/30'
-                }`}
-              >
-                {provider.connected ? 'Connected' : 'Disconnected'}
-              </span>
               <button
                 onClick={() => handleTest(provider.id)}
-                disabled={testing === provider.id}
+                disabled={testMutation.isPending}
                 className="px-3 py-1 text-xs rounded-lg border border-(--border-primary) text-(--text-secondary) hover:text-(--accent-cyan) hover:border-(--accent-cyan)/50 transition-colors disabled:opacity-50"
               >
-                {testing === provider.id ? 'Testing...' : 'Test'}
+                {testMutation.isPending ? 'Testing...' : 'Test'}
               </button>
               <button
                 onClick={() => handleDelete(provider.id)}
@@ -119,7 +116,6 @@ export function ProviderConfig() {
         </GlassCard>
       )}
 
-      {/* Add form */}
       {showForm ? (
         <GlassCard glow="cyan">
           <h3 className="text-sm font-semibold text-(--text-primary) mb-4">Add Provider</h3>
@@ -128,7 +124,7 @@ export function ProviderConfig() {
               <label className="block text-xs text-(--text-muted) mb-1 font-mono">Type</label>
               <select
                 value={formType}
-                onChange={(e) => setFormType(e.target.value as Provider['type'])}
+                onChange={(e) => setFormType(e.target.value as ProviderType)}
                 className="w-full bg-(--bg-primary) border border-(--border-primary) rounded-lg px-3 py-2 text-sm text-(--text-primary) focus:outline-none focus:border-(--accent-cyan)/50"
               >
                 {PROVIDER_TYPES.map((t) => (
@@ -148,14 +144,14 @@ export function ProviderConfig() {
               />
             </div>
 
-            {formType === 'ollama' && (
+            {(formType === 'ollama' || formType === 'openrouter') && (
               <div>
                 <label className="block text-xs text-(--text-muted) mb-1 font-mono">Base URL</label>
                 <input
                   type="text"
                   value={formBaseUrl}
                   onChange={(e) => setFormBaseUrl(e.target.value)}
-                  placeholder="http://localhost:11434"
+                  placeholder={formType === 'ollama' ? 'http://localhost:11434' : 'https://openrouter.ai/api/v1'}
                   className="w-full bg-(--bg-primary) border border-(--border-primary) rounded-lg px-3 py-2 text-sm text-(--text-primary) font-mono focus:outline-none focus:border-(--accent-cyan)/50"
                 />
               </div>
@@ -164,9 +160,10 @@ export function ProviderConfig() {
             <div className="flex gap-2">
               <button
                 onClick={handleAdd}
-                className="px-4 py-2 text-sm rounded-lg bg-(--accent-cyan)/20 text-(--accent-cyan) border border-(--accent-cyan)/40 hover:bg-(--accent-cyan)/30 transition-colors"
+                disabled={createMutation.isPending}
+                className="px-4 py-2 text-sm rounded-lg bg-(--accent-cyan)/20 text-(--accent-cyan) border border-(--accent-cyan)/40 hover:bg-(--accent-cyan)/30 transition-colors disabled:opacity-50"
               >
-                Add Provider
+                {createMutation.isPending ? 'Adding...' : 'Add Provider'}
               </button>
               <button
                 onClick={() => setShowForm(false)}

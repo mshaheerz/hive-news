@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import { eq, desc, and, sql, like } from 'drizzle-orm';
 import { router, publicProcedure } from '../trpc';
-import { articles, reporters, companies } from '@jaurnalist/db/schema';
-import type { ArticleStatus } from '@jaurnalist/shared';
+import { articles, reporters } from '@jaurnalist/db/schema';
 
 export const articlesRouter = router({
   list: publicProcedure
@@ -10,17 +9,17 @@ export const articlesRouter = router({
       z.object({
         limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0),
-        category: z.string().optional(),
+        categoryId: z.string().uuid().optional(),
         companyId: z.string().uuid().optional(),
-        status: z.enum(['draft', 'published', 'rejected', 'failed']).optional(),
+        status: z.enum(['draft', 'in_review', 'approved', 'rejected', 'published']).optional(),
         search: z.string().optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
       const conditions = [];
 
-      if (input.category) {
-        conditions.push(eq(articles.category, input.category));
+      if (input.categoryId) {
+        conditions.push(eq(articles.categoryId, input.categoryId));
       }
       if (input.companyId) {
         conditions.push(eq(articles.companyId, input.companyId));
@@ -71,7 +70,6 @@ export const articlesRouter = router({
 
       const article = result[0]!;
 
-      // Fetch reporter info if available
       let reporter = null;
       if (article.reporterId) {
         const reporterResult = await ctx.db
@@ -111,18 +109,16 @@ export const articlesRouter = router({
     .input(
       z.object({
         companyId: z.string().uuid().optional(),
-        category: z.string().optional(),
+        categoryId: z.string().uuid().optional(),
         count: z.number().min(1).max(10).default(3),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // This would typically queue a job via BullMQ.
-      // For now, return a placeholder response indicating the job was queued.
       return {
         success: true,
         message: `Article generation triggered for ${input.count} articles`,
         companyId: input.companyId ?? 'all',
-        category: input.category ?? 'all',
+        categoryId: input.categoryId ?? 'all',
         count: input.count,
       };
     }),

@@ -3,8 +3,9 @@ import IORedis from 'ioredis';
 import cron from 'node-cron';
 import { createDb } from '@jaurnalist/db';
 import { ProviderRegistry } from '@jaurnalist/ai/src/providers/registry';
-import { providers } from '@jaurnalist/db/src/schema/providers';
-import { companies } from '@jaurnalist/db/src/schema/companies';
+import { providers } from '@jaurnalist/db/schema';
+import { companies } from '@jaurnalist/db/schema';
+import { settings } from '@jaurnalist/db/schema';
 import { eq } from 'drizzle-orm';
 
 import { createArticleGenerationWorker, ARTICLE_GENERATION_QUEUE } from './queues/article-generation.queue';
@@ -25,10 +26,24 @@ if (!DATABASE_URL) {
 }
 
 const db = createDb(DATABASE_URL);
+console.log(DATABASE_URL,"db")
+async function retry<T>(fn: () => Promise<T>, retries = 5, delayMs = 5000): Promise<T> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      console.warn(`[worker] DB attempt ${i + 1}/${retries} failed, retrying in ${delayMs / 1000}s...`);
+      console.log(err,"err")
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  throw new Error('Unreachable');
+}
 
 async function buildProviderRegistry() {
   const registry = new ProviderRegistry();
-  const allProviders = await db.select().from(providers);
+  const allProviders = await retry(() => db.select().from(providers));
 
   for (const p of allProviders) {
     registry.add({
@@ -47,14 +62,37 @@ async function main() {
   console.log(`[worker] Mode: ${WORKER_MODE}`);
   console.log(`[worker] Interval: ${INTERVAL_SECONDS}s`);
 
-  const registry = await buildProviderRegistry();
-  console.log(`[worker] Loaded ${registry.list().length} AI providers`);
+  let registry: ProviderRegistry;
+  try {
+    registry = await buildProviderRegistry();
+    console.log(`[worker] Loaded ${registry.list().length} AI providers`);
+  } catch (err) {
+    console.warn('[worker] Could not load providers from DB, starting with empty registry');
+    registry = new ProviderRegistry();
+  }
 
-  const activeCompanies = await db
-    .select()
-    .from(companies)
-    .where(eq(companies.isActive, true));
-  console.log(`[worker] Found ${activeCompanies.length} active companies`);
+  let activeCompanies: Awaited<ReturnType<typeof db.select>>[] = [];
+  try {
+    activeCompanies = await retry(() =>
+      db.select().from(companies).where(eq(companies.isActive, true))
+    ) as any;
+    console.log(`[worker] Found ${activeCompanies.length} active companies`);
+  } catch (err) {
+    console.warn('[worker] Could not load companies from DB, starting with empty list');
+  }
+
+  let workflowRunning = true;
+  try {
+    const [workflowRow] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, 'workflow_running'))
+      .limit(1);
+    workflowRunning = workflowRow ? workflowRow.value === 'true' : true;
+    console.log(`[worker] Workflow running flag: ${workflowRunning}`);
+  } catch (err) {
+    console.warn('[worker] Could not determine workflow running flag, defaulting to true');
+  }
 
   if (REDIS_URL) {
     console.log('[worker] Redis detected, using BullMQ queues');
@@ -73,10 +111,14 @@ async function main() {
       createPublishWorker(connection, db),
     ];
 
-    if (WORKER_MODE === 'continuous') {
-      await setupContinuousMode(db, articleQueue, INTERVAL_SECONDS);
+    if (workflowRunning) {
+      if (WORKER_MODE === 'continuous') {
+        await setupContinuousMode(db, articleQueue, INTERVAL_SECONDS);
+      } else {
+        await setupScheduledMode(db, articleQueue, INTERVAL_SECONDS);
+      }
     } else {
-      await setupScheduledMode(db, articleQueue, INTERVAL_SECONDS);
+      console.log('[worker] Workflow is paused, skipping scheduling');
     }
 
     console.log('[worker] All BullMQ workers started');

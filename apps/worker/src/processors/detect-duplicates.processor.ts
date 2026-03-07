@@ -1,5 +1,5 @@
 import { eq, desc, ne, and, sql } from 'drizzle-orm';
-import { articles } from '@jaurnalist/db/src/schema/articles';
+import { articles } from '@jaurnalist/db/schema';
 import { cosineSimilarity } from '@jaurnalist/ai/src/utils/dedup';
 import type { DuplicateDetectionJobData } from '../queues/duplicate-detection.queue';
 

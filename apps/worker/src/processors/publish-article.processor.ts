@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { articles } from '@jaurnalist/db/src/schema/articles';
+import { articles } from '@jaurnalist/db/schema';
 import type { PublishJobData } from '../queues/publish.queue';
 
 interface PublishResult {

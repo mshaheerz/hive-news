@@ -1,6 +1,6 @@
 import { Queue } from 'bullmq';
 import { eq } from 'drizzle-orm';
-import { companies } from '@jaurnalist/db/src/schema/companies';
+import { companies } from '@jaurnalist/db/schema';
 import { addScheduledJob, type ArticleGenerationJobData } from '../queues/article-generation.queue';
 
 /**

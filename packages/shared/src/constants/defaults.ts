@@ -11,3 +11,12 @@ export const ARTICLE_LENGTHS: Record<string, number> = {
 };
 
 export const TOKEN_PREFIX = 'jrn_';
+
+export const PROVIDER_TYPES = [
+  'openai',
+  'anthropic',
+  'google',
+  'groq',
+  'openrouter',
+  'ollama',
+] as const;

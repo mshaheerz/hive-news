@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { trpc } from '@/lib/trpc/client';
 
 type WorkflowMode = 'scheduled' | 'continuous' | 'on-demand';
 
@@ -29,19 +30,86 @@ const MODES: Record<WorkflowMode, ModeConfig> = {
   },
 };
 
+const WORKFLOW_MODE_KEY = 'jaurnalist-workflow-mode';
+const WORKFLOW_INTERVAL_KEY = 'jaurnalist-workflow-interval';
+
+function readModeFromStorage(): WorkflowMode | null {
+  if (typeof window === 'undefined') return null;
+  const stored = window.localStorage.getItem(WORKFLOW_MODE_KEY);
+  if (stored && (['scheduled', 'continuous', 'on-demand'] as WorkflowMode[]).includes(stored as WorkflowMode)) {
+    return stored as WorkflowMode;
+  }
+  return null;
+}
+
+function readIntervalFromStorage(): number | null {
+  if (typeof window === 'undefined') return null;
+  const stored = window.localStorage.getItem(WORKFLOW_INTERVAL_KEY);
+  const parsed = stored ? Number(stored) : NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function WorkflowToggle() {
-  const [mode, setMode] = useState<WorkflowMode>('scheduled');
-  const [interval, setInterval] = useState(300);
-  const [running, setRunning] = useState(false);
+  const utils = trpc.useContext();
+  const statusQuery = trpc.workflow.status.useQuery();
+  const storedMode = readModeFromStorage();
+  const storedInterval = readIntervalFromStorage();
+  const initialMode = storedMode ?? statusQuery.data?.mode ?? 'scheduled';
+  const initialInterval = storedInterval ?? statusQuery.data?.interval ?? 300;
+  const [mode, setMode] = useState<WorkflowMode>(initialMode);
+  const [interval, setInterval] = useState(initialInterval);
+  const [dirty, setDirty] = useState(false);
+
+  const startMutation = trpc.workflow.start.useMutation();
+  const stopMutation = trpc.workflow.stop.useMutation({
+    onSuccess: () => {
+      utils.workflow.status.setData(undefined, (prev) => ({
+        ...(prev ?? { mode: 'scheduled', interval: 300 }),
+        running: false,
+      }));
+    },
+  });
+
+  useEffect(() => {
+    if (statusQuery.isSuccess && statusQuery.data && !dirty) {
+      setMode(statusQuery.data.mode as WorkflowMode);
+      setInterval(statusQuery.data.interval ?? 300);
+    }
+  }, [statusQuery.isSuccess, statusQuery.data, dirty]);
+
+  const running = statusQuery.data?.running ?? false;
+  const isPending = startMutation.isPending || stopMutation.isPending || statusQuery.isLoading;
 
   const handleStart = async () => {
-    // TODO: Call API to start worker
-    setRunning(true);
+    await startMutation.mutateAsync({ mode, intervalSeconds: interval });
+    setDirty(false);
+    window.localStorage.setItem(WORKFLOW_MODE_KEY, mode);
+    window.localStorage.setItem(WORKFLOW_INTERVAL_KEY, interval.toString());
+    utils.workflow.status.setData(undefined, () => ({
+      running: true,
+      mode,
+      interval,
+    }));
+  };
+
+  const handleModeChange = (nextMode: WorkflowMode) => {
+    setMode(nextMode);
+    setDirty(true);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(WORKFLOW_MODE_KEY, nextMode);
+    }
+  };
+
+  const handleIntervalChange = (value: number) => {
+    setInterval(value);
+    setDirty(true);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(WORKFLOW_INTERVAL_KEY, value.toString());
+    }
   };
 
   const handleStop = async () => {
-    // TODO: Call API to stop worker
-    setRunning(false);
+    await stopMutation.mutateAsync();
   };
 
   return (
@@ -60,21 +128,31 @@ export function WorkflowToggle() {
                 Worker Status
               </h3>
               <p className="text-xs text-(--text-muted) font-mono">
-                {running ? 'Running' : 'Stopped'} &middot; Mode: {MODES[mode].label}
+                {statusQuery.isLoading ? 'Loading worker status…' : running ? 'Running' : 'Stopped'}{' '}
+                &middot; Mode: {MODES[mode]?.label ?? 'Scheduled'}
               </p>
             </div>
           </div>
           <button
             onClick={running ? handleStop : handleStart}
+            disabled={isPending}
             className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
-              running
-                ? 'border-red-400/40 text-red-400 hover:bg-red-400/10'
-                : 'border-green-400/40 text-green-400 hover:bg-green-400/10'
+              isPending
+                ? 'border-gray-400/30 text-gray-400 cursor-not-allowed'
+                : running
+                  ? 'border-red-400/40 text-red-400 hover:bg-red-400/10'
+                  : 'border-green-400/40 text-green-400 hover:bg-green-400/10'
             }`}
           >
             {running ? 'Stop Worker' : 'Start Worker'}
           </button>
         </div>
+        {startMutation.data && (
+          <p className="text-xs text-(--text-muted) mt-4 font-mono">
+            Queued {startMutation.data.queued} job{startMutation.data.queued === 1 ? '' : 's'} for{' '}
+            {startMutation.data.companyCount} active company{startMutation.data.companyCount === 1 ? '' : 'ies'}.
+          </p>
+        )}
       </GlassCard>
 
       {/* Mode selection */}
@@ -84,7 +162,7 @@ export function WorkflowToggle() {
           return (
             <button
               key={key}
-              onClick={() => setMode(key)}
+              onClick={() => handleModeChange(key)}
               className="text-left p-4 rounded-xl border transition-all duration-200"
               style={{
                 backgroundColor: isActive ? `color-mix(in srgb, ${config.color} 10%, transparent)` : 'var(--bg-card)',
@@ -121,7 +199,7 @@ export function WorkflowToggle() {
             <input
               type="number"
               value={interval}
-              onChange={(e) => setInterval(Number(e.target.value))}
+              onChange={(e) => handleIntervalChange(Number(e.target.value))}
               min={30}
               step={30}
               className="w-32 bg-(--bg-primary) border border-(--border-primary) rounded-lg px-3 py-2 text-sm text-(--text-primary) font-mono focus:outline-none focus:border-(--accent-cyan)/50"

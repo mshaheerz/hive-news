@@ -9,6 +9,7 @@ export { reportersRouter } from './routers/reporters';
 export { providersRouter } from './routers/providers';
 export { settingsRouter } from './routers/settings';
 export { dashboardRouter } from './routers/dashboard';
+export { categoriesRouter } from './routers/categories';
 
 // Re-export auth middleware
 export { authenticatedProcedure, adminProcedure } from './middleware/auth';

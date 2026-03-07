@@ -1,7 +1,7 @@
 import { Queue } from 'bullmq';
 import { eq, sql } from 'drizzle-orm';
-import { companies } from '@jaurnalist/db/src/schema/companies';
-import { categories } from '@jaurnalist/db/src/schema/categories';
+import { companies } from '@jaurnalist/db/schema';
+import { categories } from '@jaurnalist/db/schema';
 import { addContinuousJob, type ArticleGenerationJobData } from '../queues/article-generation.queue';
 
 // Track rotation state to ensure coverage across companies and categories

@@ -36,7 +36,7 @@ export const companiesRouter = router({
         .select()
         .from(reporters)
         .where(eq(reporters.companyId, input.id))
-        .orderBy(reporters.name);
+        .orderBy(reporters.journalistName);
 
       return { ...company, reporters: companyReporters };
     }),
@@ -44,13 +44,11 @@ export const companiesRouter = router({
   create: publicProcedure
     .input(
       z.object({
-        name: z.string().min(1).max(255),
-        slug: z.string().min(1).max(255),
+        name: z.string().min(1).max(200),
+        slug: z.string().min(1).max(200),
         description: z.string().optional(),
-        defaultProviderId: z.string().uuid().optional(),
-        defaultModelId: z.string().optional(),
-        categories: z.array(z.string()).default([]),
-        settings: z.record(z.unknown()).default({}),
+        logoUrl: z.string().optional(),
+        isActive: z.boolean().default(true),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -60,10 +58,8 @@ export const companiesRouter = router({
           name: input.name,
           slug: input.slug,
           description: input.description,
-          defaultProviderId: input.defaultProviderId,
-          defaultModelId: input.defaultModelId,
-          categories: input.categories,
-          settings: input.settings,
+          logoUrl: input.logoUrl,
+          isActive: input.isActive,
         })
         .returning();
 
@@ -74,13 +70,12 @@ export const companiesRouter = router({
     .input(
       z.object({
         id: z.string().uuid(),
-        name: z.string().min(1).max(255).optional(),
-        slug: z.string().min(1).max(255).optional(),
+        name: z.string().min(1).max(200).optional(),
+        slug: z.string().min(1).max(200).optional(),
         description: z.string().optional(),
-        defaultProviderId: z.string().uuid().optional(),
-        defaultModelId: z.string().optional(),
-        categories: z.array(z.string()).optional(),
-        settings: z.record(z.unknown()).optional(),
+        logoUrl: z.string().optional(),
+        ceoId: z.string().uuid().optional(),
+        isActive: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -88,7 +83,7 @@ export const companiesRouter = router({
 
       const result = await ctx.db
         .update(companies)
-        .set({ ...updates, updatedAt: new Date() })
+        .set(updates)
         .where(eq(companies.id, id))
         .returning();
 

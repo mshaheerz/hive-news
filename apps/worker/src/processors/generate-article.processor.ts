@@ -1,12 +1,13 @@
 import { eq, desc, and } from 'drizzle-orm';
 import type { ProviderRegistry } from '@jaurnalist/ai/src/providers/registry';
 import { ArticlePipeline, type CompanyData } from '@jaurnalist/ai/src/pipelines/article-pipeline';
-import { companies } from '@jaurnalist/db/src/schema/companies';
-import { reporters } from '@jaurnalist/db/src/schema/reporters';
-import { articles } from '@jaurnalist/db/src/schema/articles';
-import { categories } from '@jaurnalist/db/src/schema/categories';
+import { companies } from '@jaurnalist/db/schema';
+import { reporters } from '@jaurnalist/db/schema';
+import { articles } from '@jaurnalist/db/schema';
+import { categories } from '@jaurnalist/db/schema';
 import { slugify } from '@jaurnalist/shared';
 import type { ArticleGenerationJobData } from '../queues/article-generation.queue';
+import { logWorkflowEvent } from '../utils/workflow-log';
 
 interface GenerationResult {
   articleId: string | null;
@@ -66,6 +67,10 @@ export async function processArticleGeneration(
     ? allCategories.filter((c) => c.slug === categorySlug).map((c) => c.name)
     : allCategories.map((c) => c.name);
 
+  if (allCategories.length === 0) {
+    throw new Error('No categories configured for article generation');
+  }
+
   // Fetch recent article titles
   const recentArticles = await db
     .select({ title: articles.title })
@@ -96,9 +101,28 @@ export async function processArticleGeneration(
     recentEmbeddings: [],
   };
 
+  await logWorkflowEvent(db, {
+    companyId: company.id,
+    event: 'generation_started',
+    message: `Starting generation cycle for ${company.name}`,
+    metadata: {
+      reporterCount: companyReporters.length,
+      categoryCount: categoryNames.length,
+    },
+  });
+
   // Run the pipeline
   const pipeline = new ArticlePipeline(registry);
   const generated = await pipeline.runCycle(companyData);
+
+  await logWorkflowEvent(db, {
+    companyId: company.id,
+    event: 'topics_selected',
+    message: `CEO selected ${generated.length} topics`,
+    metadata: {
+      topicCategories: generated.map((g) => g.topic.category),
+    },
+  });
 
   // Save generated articles to DB
   const results: GenerationResult[] = [];
@@ -126,10 +150,26 @@ export async function processArticleGeneration(
           })
           .returning({ id: articles.id });
 
+        if (!inserted?.id) {
+          throw new Error('Article insert returned no id');
+        }
+
         results.push({
-          articleId: inserted!.id,
+          articleId: inserted.id,
           title: gen.article.title,
           status: gen.status,
+        });
+
+        await logWorkflowEvent(db, {
+          companyId: company.id,
+          reporterId: gen.reporterId,
+          event: 'article_saved',
+          message: `Article "${gen.article.title}" saved (${gen.status})`,
+          metadata: {
+            status: gen.status,
+            topic: gen.topic.topic,
+            category: gen.topic.category,
+          },
         });
       } catch (err) {
         results.push({
@@ -137,6 +177,17 @@ export async function processArticleGeneration(
           title: gen.article.title,
           status: 'error',
           error: err instanceof Error ? err.message : String(err),
+        });
+
+        await logWorkflowEvent(db, {
+          companyId: company.id,
+          reporterId: gen.reporterId,
+          event: 'article_save_failed',
+          message: `Failed to persist "${gen.article.title}"`,
+          metadata: {
+            status: 'error',
+            error: err instanceof Error ? err.message : String(err),
+          },
         });
       }
     } else {
@@ -146,8 +197,31 @@ export async function processArticleGeneration(
         status: gen.status,
         error: gen.error,
       });
+
+      await logWorkflowEvent(db, {
+        companyId: company.id,
+        reporterId: gen.reporterId,
+        event: 'article_generation_failed',
+        message: `Reporter ${gen.reporterId} failed on "${gen.topic.topic}"`,
+        metadata: {
+          error: gen.error ?? 'unknown',
+          topic: gen.topic.topic,
+        },
+      });
     }
   }
+
+  const successCount = results.filter((result) => Boolean(result.articleId)).length;
+
+  await logWorkflowEvent(db, {
+    companyId: company.id,
+    event: 'generation_completed',
+    message: `Cycle finished: ${successCount}/${results.length} articles persisted`,
+    metadata: {
+      successCount,
+      total: results.length,
+    },
+  });
 
   return results;
 }
