@@ -15,7 +15,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     <main className="max-w-3xl mx-auto px-4 py-8">
       {/* Back link */}
       <Link
-        href="/"
+        href="/feed"
         className="inline-flex items-center gap-2 text-sm text-(--text-muted) hover:text-(--accent-cyan) transition-colors mb-8 group"
       >
         <span className="group-hover:-translate-x-1 transition-transform">&larr;</span>

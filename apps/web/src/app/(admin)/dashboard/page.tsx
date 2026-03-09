@@ -1,18 +1,20 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 
 import { trpc } from '@/lib/trpc/client';
+import { PipelineViz } from '@/components/dashboard/PipelineViz';
 
-const AgentFlowViz = dynamic(() => import('@/components/three/AgentFlowViz').then((m) => m.AgentFlowViz), {
-  ssr: false,
-  loading: () => (
-    <div className="glass-card p-8 rounded-xl border border-(--border-primary) animate-pulse h-125 flex items-center justify-center">
-      <span className="text-sm text-(--text-muted) font-mono">Loading visualization...</span>
-    </div>
-  ),
-});
+const NewsroomViz = dynamic(
+  () => import('@/components/dashboard/newsroom/NewsroomViz').then((m) => m.NewsroomViz),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="glass-card rounded-xl border border-(--border-primary) h-[300px] animate-pulse" />
+    ),
+  },
+);
 
 function StatCard({ label, value, color }: { label: string; value: string | number; color: string }) {
   return (
@@ -47,6 +49,7 @@ function formatEventLabel(event: string): string {
 
 export default function DashboardPage() {
   const { data } = trpc.dashboard.stats.useQuery();
+  const { data: pipelineData } = trpc.dashboard.pipeline.useQuery();
   const { data: logsData = [], isLoading: logsLoading } = trpc.dashboard.logs.useQuery({ limit: 12 });
   const { data: reviewEntries = [], isLoading: reviewLoading } = trpc.dashboard.reviewLogs.useQuery({
     limit: 5,
@@ -72,17 +75,49 @@ export default function DashboardPage() {
 
   return (
     <main className="max-w-6xl mx-auto px-4 py-8">
-      <header className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-(--text-primary)">Dashboard</h1>
-          <p className="text-sm text-(--text-muted) mt-1">System overview and controls</p>
+      {/* Header with nav */}
+      <header className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-lg border border-(--border-primary) text-(--text-muted) hover:text-(--accent-cyan) hover:border-(--accent-cyan)/40 transition-all"
+            >
+              <span>&larr;</span> Home
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold text-(--text-primary)">Dashboard</h1>
+              <p className="text-xs text-(--text-muted) mt-0.5">System overview and controls</p>
+            </div>
+          </div>
+          <Link
+            href="/feed"
+            className="px-4 py-2 text-sm rounded-lg border border-(--border-primary) text-(--text-secondary) hover:text-(--accent-cyan) hover:border-(--accent-cyan)/50 transition-colors"
+          >
+            View Feed
+          </Link>
         </div>
-        <Link
-          href="/"
-          className="px-4 py-2 text-sm rounded-lg border border-(--border-primary) text-(--text-secondary) hover:text-(--accent-cyan) hover:border-(--accent-cyan)/50 transition-colors"
-        >
-          View Feed
-        </Link>
+
+        {/* Settings quick-access bar — moved to top */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          <span className="text-xs text-(--text-muted) font-mono shrink-0">Settings:</span>
+          {[
+            { label: 'Workflow', href: '/settings/workflow', color: '#f59e0b' },
+            { label: 'Providers', href: '/settings/providers', color: 'var(--accent-cyan)' },
+            { label: 'Companies', href: '/settings/companies', color: 'var(--accent-purple)' },
+            { label: 'Reporters', href: '/settings/reporters', color: '#22c55e' },
+            { label: 'Categories', href: '/settings/categories', color: '#fb923c' },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="shrink-0 text-xs px-2.5 py-1 rounded-md border border-(--border-primary) hover:border-opacity-50 transition-all font-mono"
+              style={{ color: item.color }}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
       </header>
 
       {/* Stats grid */}
@@ -98,12 +133,17 @@ export default function DashboardPage() {
       {/* Agent Flow Visualization */}
       <section className="mb-8">
         <h2 className="text-lg font-semibold text-(--text-primary) mb-4">Workflow Pipeline</h2>
-        <div className="glass-card rounded-xl border border-(--border-primary) h-125 overflow-hidden">
-          <AgentFlowViz />
+        <div className="glass-card rounded-xl border border-(--border-primary) min-h-[200px] overflow-hidden">
+          <PipelineViz companies={pipelineData} />
         </div>
       </section>
 
-      {/* Two-column layout: Logs + Rejections */}
+      {/* Live Newsroom Visualization */}
+      <section className="mb-8">
+        <NewsroomViz />
+      </section>
+
+      {/* Two-column layout: Logs + Rejections — with inline scroll */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
         {/* Workflow Activity Logs - wider column */}
         <section className="lg:col-span-3">
@@ -116,7 +156,7 @@ export default function DashboardPage() {
               {logsLoading ? '...' : `${logEntries.length}`}
             </span>
           </div>
-          <div className="glass-card rounded-xl border border-(--border-primary) overflow-hidden">
+          <div className="glass-card rounded-xl border border-(--border-primary) overflow-hidden max-h-[480px] overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
             {logsLoading ? (
               <div className="p-6">
                 <p className="text-sm text-(--text-muted)">Loading events...</p>
@@ -194,7 +234,7 @@ export default function DashboardPage() {
               {reviewLoading ? '...' : `${reviewEntries.length}`}
             </span>
           </div>
-          <div className="glass-card rounded-xl border border-(--border-primary) overflow-hidden">
+          <div className="glass-card rounded-xl border border-(--border-primary) overflow-hidden max-h-[480px] overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
             {reviewLoading ? (
               <div className="p-6">
                 <p className="text-sm text-(--text-muted)">Loading...</p>
@@ -241,7 +281,7 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      {/* Recent articles */}
+      {/* Recent articles — with inline scroll */}
       <section className="mb-8">
         <div className="flex items-center justify-between mb-3">
           <div>
@@ -252,7 +292,7 @@ export default function DashboardPage() {
             {articlesLoading ? '...' : `${recentArticlesData?.length ?? 0}`}
           </span>
         </div>
-        <div className="glass-card rounded-xl border border-(--border-primary) overflow-hidden">
+        <div className="glass-card rounded-xl border border-(--border-primary) overflow-hidden max-h-[360px] overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
           {articlesLoading ? (
             <div className="p-6">
               <p className="text-sm text-(--text-muted)">Loading articles...</p>
@@ -267,7 +307,7 @@ export default function DashboardPage() {
               {recentArticlesData.map((article) => (
                 <Link
                   key={article.id}
-                  href={`/article/${article.slug}`}
+                  href={`/feed/article/${article.slug}`}
                   className="block px-4 py-3 hover:bg-(--bg-secondary)/30 transition-colors"
                 >
                   <div className="flex items-center justify-between mb-1">
@@ -294,34 +334,6 @@ export default function DashboardPage() {
               ))}
             </div>
           )}
-        </div>
-      </section>
-
-      {/* Quick nav to settings */}
-      <section>
-        <h2 className="text-lg font-semibold text-(--text-primary) mb-4">Settings</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-          {[
-            { label: 'AI Providers', href: '/settings/providers', color: 'var(--accent-cyan)' },
-            { label: 'Companies', href: '/settings/companies', color: 'var(--accent-purple)' },
-            { label: 'Reporters', href: '/settings/reporters', color: '#22c55e' },
-            { label: 'Categories', href: '/settings/categories', color: '#fb923c' },
-            { label: 'Workflow', href: '/settings/workflow', color: '#f59e0b' },
-          ].map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="glass-card p-4 rounded-xl border border-(--border-primary) hover:border-opacity-50 transition-all duration-200 group"
-            >
-              <span
-                className="text-sm font-medium transition-colors"
-                style={{ color: item.color }}
-              >
-                {item.label}
-              </span>
-              <span className="block text-xs text-(--text-muted) mt-1 font-mono">&rarr;</span>
-            </Link>
-          ))}
         </div>
       </section>
     </main>

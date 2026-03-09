@@ -76,6 +76,56 @@ export const dashboardRouter = router({
     };
   }),
 
+  /** Fetch the company → CEO → reporters hierarchy for the pipeline visualization */
+  pipeline: publicProcedure.query(async ({ ctx }) => {
+    // Get all active companies
+    const companyRows = await ctx.db
+      .select({
+        id: companies.id,
+        name: companies.name,
+        ceoId: companies.ceoId,
+        isActive: companies.isActive,
+      })
+      .from(companies)
+      .where(eq(companies.isActive, true));
+
+    // Get all active reporters
+    const reporterRows = await ctx.db
+      .select({
+        id: reporters.id,
+        companyId: reporters.companyId,
+        journalistName: reporters.journalistName,
+        modelId: reporters.modelId,
+        role: reporters.role,
+        isActive: reporters.isActive,
+      })
+      .from(reporters)
+      .where(eq(reporters.isActive, true));
+
+    // Build hierarchy: company → ceo + reporters
+    return companyRows.map((company) => {
+      const companyReporters = reporterRows.filter(
+        (r) => r.companyId === company.id
+      );
+      const ceo = companyReporters.find(
+        (r) => r.role === 'ceo' || r.id === company.ceoId
+      );
+      const reporterList = companyReporters.filter(
+        (r) => r.role === 'reporter' && r.id !== company.ceoId
+      );
+
+      return {
+        name: company.name,
+        ceo: ceo?.journalistName ?? 'No CEO',
+        ceoModel: ceo?.modelId ?? null,
+        reporters: reporterList.map((r) => ({
+          name: r.journalistName,
+          model: r.modelId,
+        })),
+      };
+    });
+  }),
+
   logs: publicProcedure
     .input(
       z.object({

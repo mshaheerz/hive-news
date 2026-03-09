@@ -73,7 +73,8 @@ export function ParticleField() {
     <Canvas
       camera={{ position: [0, 0, 15], fov: 60 }}
       gl={{ antialias: true, alpha: true }}
-      style={{ background: 'transparent' }}
+      style={{ background: 'transparent', pointerEvents: 'none' }}
+      events={() => ({ enabled: false, priority: 0, compute: () => {} } as any)}
     >
       <Particles />
     </Canvas>

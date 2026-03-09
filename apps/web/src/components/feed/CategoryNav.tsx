@@ -22,7 +22,7 @@ export function CategoryNav({ categories, activeSlug }: CategoryNavProps) {
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {/* All option */}
         <Link
-          href="/"
+          href="/feed"
           className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 border ${
             isAllActive
               ? 'bg-(--accent-cyan)/20 text-(--accent-cyan) border-(--accent-cyan)/50'
@@ -38,7 +38,7 @@ export function CategoryNav({ categories, activeSlug }: CategoryNavProps) {
           return (
             <Link
               key={cat.slug}
-              href={`/${cat.slug}`}
+              href={`/feed/${cat.slug}`}
               className="shrink-0 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 border"
               style={{
                 backgroundColor: isActive ? `${cat.color}20` : 'transparent',

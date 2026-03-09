@@ -135,6 +135,15 @@ export async function processArticleGeneration(
 
       const articleSlug = slugify(gen.article.title) + '-' + Date.now().toString(36);
 
+      // Log review_started event for richer newsroom animations
+      await logWorkflowEvent(db, {
+        companyId: company.id,
+        reporterId: gen.reporterId,
+        event: 'review_started',
+        message: `CEO reviewing article: "${gen.article.title}"`,
+        metadata: { topic: gen.topic.topic, category: gen.topic.category },
+      });
+
       try {
         const [inserted] = await db
           .insert(articles)
@@ -173,6 +182,25 @@ export async function processArticleGeneration(
             category: gen.topic.category,
           },
         });
+
+        // Log approval/rejection events for newsroom animations
+        if (gen.review?.decision === 'approved') {
+          await logWorkflowEvent(db, {
+            companyId: company.id,
+            reporterId: gen.reporterId,
+            event: 'article_approved',
+            message: `Approved: "${gen.article.title}"`,
+            metadata: { score: gen.review.score ?? null },
+          });
+        } else if (gen.review?.decision === 'rejected') {
+          await logWorkflowEvent(db, {
+            companyId: company.id,
+            reporterId: gen.reporterId,
+            event: 'article_rejected',
+            message: `Rejected: "${gen.article.title}"`,
+            metadata: { score: gen.review.score ?? null, feedback: gen.review.feedback ?? null },
+          });
+        }
       } catch (err) {
         results.push({
           articleId: null,

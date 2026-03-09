@@ -39,36 +39,18 @@ interface FigureProps {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Demo data                                                                 */
+/*  Reporter color palette                                                    */
 /* -------------------------------------------------------------------------- */
 
-const DEMO_COMPANIES: CompanyData[] = [
-  {
-    name: 'NeuraCorp',
-    ceo: 'Aria Chen',
-    reporters: ['Tech', 'Finance', 'Science'],
-  },
-  {
-    name: 'QuantumEdge',
-    ceo: 'Marcus Holt',
-    reporters: ['Health', 'Politics'],
-  },
-  {
-    name: 'SynthWave AI',
-    ceo: 'Lena Park',
-    reporters: ['Culture', 'Sports', 'Tech'],
-  },
+const PALETTE = [
+  '#00f0ff', '#f0c040', '#40f080', '#ff6090',
+  '#f08040', '#c080ff', '#80d0ff', '#ff80b0',
+  '#a0ff60', '#60b0ff', '#ffb060', '#b060ff',
 ];
 
-const REPORTER_COLORS: Record<string, string> = {
-  Tech: '#00f0ff',
-  Finance: '#f0c040',
-  Science: '#40f080',
-  Health: '#ff6090',
-  Politics: '#f08040',
-  Culture: '#c080ff',
-  Sports: '#80d0ff',
-};
+function getReporterColor(index: number): string {
+  return PALETTE[index % PALETTE.length];
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Layout helpers                                                            */
@@ -133,7 +115,7 @@ function buildGraph(companies: CompanyData[]) {
         label: rep,
         position: repPos,
         type: 'reporter',
-        color: REPORTER_COLORS[rep] ?? '#ffffff',
+        color: getReporterColor(ci * 10 + ri),
       });
 
       edges.push({ from: ceoPos, to: repPos });
@@ -865,7 +847,21 @@ function BackgroundDust() {
 /* -------------------------------------------------------------------------- */
 
 export function AgentFlowViz({ companies }: AgentFlowVizProps) {
-  const data = companies && companies.length > 0 ? companies : DEMO_COMPANIES;
+  if (!companies || companies.length === 0) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-center p-8">
+        <div className="text-4xl mb-4 opacity-20">
+          <span className="font-mono">&gt;_</span>
+        </div>
+        <h3 className="text-base font-semibold text-(--text-secondary) mb-2">
+          No pipeline data yet
+        </h3>
+        <p className="text-sm text-(--text-muted) max-w-sm">
+          Add companies with CEOs and reporters in Settings to see the workflow pipeline visualization here.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <Canvas
@@ -875,7 +871,7 @@ export function AgentFlowViz({ companies }: AgentFlowVizProps) {
     >
       <ambientLight intensity={0.1} />
       <BackgroundDust />
-      <Scene companies={data} />
+      <Scene companies={companies} />
     </Canvas>
   );
 }
