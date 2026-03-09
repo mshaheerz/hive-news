@@ -146,7 +146,9 @@ export async function processArticleGeneration(
             slug: articleSlug,
             content: gen.article.content,
             summary: gen.article.summary,
-            status: gen.review?.decision === 'approved' ? 'approved' : 'draft',
+            status: gen.review?.decision === 'approved' ? 'published' : 'draft',
+            publishedAt: gen.review?.decision === 'approved' ? new Date() : undefined,
+            metadataJson: gen.sourceUrl ? { sourceUrl: gen.sourceUrl, source: gen.topic.category } : undefined,
           })
           .returning({ id: articles.id });
 

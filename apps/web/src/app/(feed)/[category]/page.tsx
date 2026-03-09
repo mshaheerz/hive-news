@@ -44,7 +44,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       <CategoryNav categories={DEFAULT_CATEGORIES} activeSlug={category} />
 
       <div className="mt-6">
-        <ArticleFeed />
+        <ArticleFeed categorySlug={category} />
       </div>
     </main>
   );

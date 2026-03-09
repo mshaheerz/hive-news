@@ -26,6 +26,7 @@ export interface TopicSelectionInput {
   categories: string[];
   recentTitles: string[];
   count: number;
+  newsContext?: string;
 }
 
 export interface ReviewInput {
@@ -48,26 +49,34 @@ export class CEOAgent extends BaseAgent {
   }
 
   async selectTopics(input: TopicSelectionInput): Promise<TopicAssignment[]> {
-    const { categories, recentTitles, count } = input;
+    const { categories, recentTitles, count, newsContext } = input;
     const clampedCount = Math.min(Math.max(count, 1), 10);
 
     const recentTitlesList = recentTitles.length > 0
       ? recentTitles.map((t) => `- ${t}`).join('\n')
       : 'No recent articles.';
 
+    const newsSection = newsContext
+      ? `\nHere are REAL current news stories fetched from live RSS feeds. Base your topic selections on these:\n\n${newsContext}\n\nSelect topics based on these REAL stories. Include the source URL in your briefing so reporters can reference it.`
+      : '';
+
     const prompt = `Select ${clampedCount} compelling news topics for your newsroom to cover.
+${newsSection}
 
 Available categories: ${categories.join(', ')}
 
 Recently published article titles (avoid similar topics):
 ${recentTitlesList}
 
-Select ${clampedCount} diverse, newsworthy topics spread across different categories. For each topic, provide a clear briefing for the assigned reporter explaining the angle and key points to cover.`;
+Select ${clampedCount} diverse, newsworthy topics${newsContext ? ' based on the real news stories above' : ' about REAL events and developments'} spread across different categories. For each topic:
+- Name specific real companies, people, or organizations involved
+- Provide real context and background facts in the briefing${newsContext ? '\n- Include the source URL from the news feed in the briefing' : ''}
+- Explain the angle and key real-world points to cover`;
 
     const result = await this.generateObjectResponse(prompt, TopicSelectionOutputSchema, {
       schemaName: 'TopicSelectionOutput',
       schemaDescription: 'Selected topics for the newsroom to cover',
-      temperature: 0.9,
+      temperature: 0.7,
       maxTokens: 2048,
     });
 

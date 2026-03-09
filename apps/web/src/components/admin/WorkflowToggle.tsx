@@ -10,206 +10,300 @@ interface ModeConfig {
   label: string;
   description: string;
   color: string;
+  icon: string;
 }
 
 const MODES: Record<WorkflowMode, ModeConfig> = {
   scheduled: {
     label: 'Scheduled',
-    description: 'Articles are generated at fixed time intervals. Best for consistent publishing schedules.',
+    description: 'Generate articles at fixed intervals. Best for consistent publishing.',
     color: 'var(--accent-cyan)',
+    icon: '⏱',
   },
   continuous: {
     label: 'Continuous',
-    description: 'Articles are generated continuously as fast as possible. Best for high-volume news coverage.',
+    description: 'Generate articles continuously at max speed. Best for high-volume coverage.',
     color: '#22c55e',
+    icon: '⚡',
   },
   'on-demand': {
     label: 'On-Demand',
-    description: 'Articles are only generated when manually triggered. Best for controlled publishing.',
+    description: 'Generate only when manually triggered. Best for controlled publishing.',
     color: 'var(--accent-purple)',
+    icon: '🎯',
   },
 };
 
-const WORKFLOW_MODE_KEY = 'jaurnalist-workflow-mode';
-const WORKFLOW_INTERVAL_KEY = 'jaurnalist-workflow-interval';
+const VALID_MODES: WorkflowMode[] = ['scheduled', 'continuous', 'on-demand'];
 
-function readModeFromStorage(): WorkflowMode | null {
-  if (typeof window === 'undefined') return null;
-  const stored = window.localStorage.getItem(WORKFLOW_MODE_KEY);
-  if (stored && (['scheduled', 'continuous', 'on-demand'] as WorkflowMode[]).includes(stored as WorkflowMode)) {
-    return stored as WorkflowMode;
-  }
-  return null;
-}
-
-function readIntervalFromStorage(): number | null {
-  if (typeof window === 'undefined') return null;
-  const stored = window.localStorage.getItem(WORKFLOW_INTERVAL_KEY);
-  const parsed = stored ? Number(stored) : NaN;
-  return Number.isFinite(parsed) ? parsed : null;
+function isValidMode(value: unknown): value is WorkflowMode {
+  return typeof value === 'string' && VALID_MODES.includes(value as WorkflowMode);
 }
 
 export function WorkflowToggle() {
   const utils = trpc.useContext();
-  const statusQuery = trpc.workflow.status.useQuery();
-  const storedMode = readModeFromStorage();
-  const storedInterval = readIntervalFromStorage();
-  const initialMode = storedMode ?? statusQuery.data?.mode ?? 'scheduled';
-  const initialInterval = storedInterval ?? statusQuery.data?.interval ?? 300;
-  const [mode, setMode] = useState<WorkflowMode>(initialMode);
-  const [interval, setInterval] = useState(initialInterval);
-  const [dirty, setDirty] = useState(false);
+  const statusQuery = trpc.workflow.status.useQuery(undefined, {
+    refetchOnWindowFocus: true,
+  });
 
-  const startMutation = trpc.workflow.start.useMutation();
-  const stopMutation = trpc.workflow.stop.useMutation({
-    onSuccess: () => {
-      utils.workflow.status.setData(undefined, (prev) => ({
-        ...(prev ?? { mode: 'scheduled', interval: 300 }),
-        running: false,
+  // Local state is only used for unsaved user edits.
+  // Server data is the single source of truth after each fetch.
+  const [localMode, setLocalMode] = useState<WorkflowMode | null>(null);
+  const [localInterval, setLocalInterval] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Derive displayed values: local override > server data > defaults
+  const serverMode = isValidMode(statusQuery.data?.mode) ? statusQuery.data.mode : 'scheduled';
+  const serverInterval = statusQuery.data?.interval ?? 300;
+  const serverRunning = statusQuery.data?.running ?? false;
+
+  const mode = localMode ?? serverMode;
+  const interval = localInterval ?? serverInterval;
+  const running = serverRunning;
+  const isLoaded = statusQuery.isSuccess;
+
+  // Clear local overrides when server data arrives (so refresh syncs correctly)
+  useEffect(() => {
+    if (statusQuery.isSuccess) {
+      setLocalMode(null);
+      setLocalInterval(null);
+    }
+  }, [statusQuery.isSuccess, statusQuery.dataUpdatedAt]);
+
+  const startMutation = trpc.workflow.start.useMutation({
+    onSuccess: (data) => {
+      setError(null);
+      setLocalMode(null);
+      setLocalInterval(null);
+      if (data.companyCount === 0) {
+        setSuccessMsg('No active companies found. Add a company first.');
+      } else {
+        setSuccessMsg(`Started! Queued ${data.queued} job(s) for ${data.companyCount} company(ies).`);
+      }
+      // Immediately update cache so UI shows "Running"
+      utils.workflow.status.setData(undefined, () => ({
+        running: true,
+        mode,
+        interval,
       }));
+      // Also refetch from server to confirm
+      utils.workflow.status.invalidate();
+      setTimeout(() => setSuccessMsg(null), 5000);
+    },
+    onError: (err) => {
+      setError(err.message || 'Failed to start workflow. Check Redis connection.');
+      setSuccessMsg(null);
     },
   });
 
-  useEffect(() => {
-    if (statusQuery.isSuccess && statusQuery.data && !dirty) {
-      setMode(statusQuery.data.mode as WorkflowMode);
-      setInterval(statusQuery.data.interval ?? 300);
-    }
-  }, [statusQuery.isSuccess, statusQuery.data, dirty]);
+  const stopMutation = trpc.workflow.stop.useMutation({
+    onSuccess: () => {
+      setError(null);
+      setSuccessMsg('Workflow stopped.');
+      // Immediately update cache so UI shows "Stopped"
+      utils.workflow.status.setData(undefined, (prev) => ({
+        mode: prev?.mode ?? 'scheduled',
+        interval: prev?.interval ?? 300,
+        running: false,
+      }));
+      utils.workflow.status.invalidate();
+      setTimeout(() => setSuccessMsg(null), 3000);
+    },
+    onError: (err) => {
+      setError(err.message || 'Failed to stop workflow.');
+    },
+  });
 
-  const running = statusQuery.data?.running ?? false;
-  const isPending = startMutation.isPending || stopMutation.isPending || statusQuery.isLoading;
+  const isPending = startMutation.isPending || stopMutation.isPending;
 
   const handleStart = async () => {
-    await startMutation.mutateAsync({ mode, intervalSeconds: interval });
-    setDirty(false);
-    window.localStorage.setItem(WORKFLOW_MODE_KEY, mode);
-    window.localStorage.setItem(WORKFLOW_INTERVAL_KEY, interval.toString());
-    utils.workflow.status.setData(undefined, () => ({
-      running: true,
-      mode,
-      interval,
-    }));
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      await startMutation.mutateAsync({ mode, intervalSeconds: interval });
+    } catch {
+      // Error handled by onError callback
+    }
   };
 
   const handleModeChange = (nextMode: WorkflowMode) => {
-    setMode(nextMode);
-    setDirty(true);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(WORKFLOW_MODE_KEY, nextMode);
-    }
+    setLocalMode(nextMode);
+    setError(null);
+    setSuccessMsg(null);
   };
 
   const handleIntervalChange = (value: number) => {
-    setInterval(value);
-    setDirty(true);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(WORKFLOW_INTERVAL_KEY, value.toString());
-    }
+    setLocalInterval(value);
   };
 
   const handleStop = async () => {
-    await stopMutation.mutateAsync();
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      await stopMutation.mutateAsync();
+    } catch {
+      // Error handled by onError callback
+    }
   };
 
+  const activeConfig = MODES[mode];
+  const hasUnsavedChanges = localMode !== null || localInterval !== null;
+
   return (
-    <div className="space-y-6">
-      {/* Status */}
+    <div className="space-y-8">
+      {/* Worker Control Panel */}
       <GlassCard>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-3 h-3 rounded-full ${
-                running ? 'bg-green-400 animate-pulse' : 'bg-(--text-muted)'
-              }`}
-            />
-            <div>
-              <h3 className="text-sm font-semibold text-(--text-primary)">
-                Worker Status
-              </h3>
-              <p className="text-xs text-(--text-muted) font-mono">
-                {statusQuery.isLoading ? 'Loading worker status…' : running ? 'Running' : 'Stopped'}{' '}
-                &middot; Mode: {MODES[mode]?.label ?? 'Scheduled'}
-              </p>
+        <div className="flex flex-col gap-5">
+          {/* Status row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                {!isLoaded ? (
+                  <div className="w-3.5 h-3.5 rounded-full bg-gray-500 animate-pulse" />
+                ) : (
+                  <>
+                    <div
+                      className={`w-3.5 h-3.5 rounded-full ${
+                        running ? 'bg-green-400' : 'bg-gray-500'
+                      }`}
+                    />
+                    {running && (
+                      <div className="absolute inset-0 w-3.5 h-3.5 rounded-full bg-green-400 animate-ping opacity-40" />
+                    )}
+                  </>
+                )}
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-(--text-primary)">
+                  {!isLoaded ? 'Loading...' : running ? 'Worker Running' : 'Worker Stopped'}
+                </h3>
+                <p className="text-xs text-(--text-muted) font-mono mt-0.5">
+                  Mode: {activeConfig.label}
+                  {mode === 'scheduled' && ` (every ${Math.floor(interval / 60)}m ${interval % 60}s)`}
+                  {hasUnsavedChanges && (
+                    <span className="text-yellow-400 ml-2">- unsaved</span>
+                  )}
+                </p>
+              </div>
             </div>
-          </div>
-          <button
-            onClick={running ? handleStop : handleStart}
-            disabled={isPending}
-            className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
-              isPending
-                ? 'border-gray-400/30 text-gray-400 cursor-not-allowed'
+            <button
+              onClick={running ? handleStop : handleStart}
+              disabled={isPending || !isLoaded}
+              className={`px-6 py-2.5 text-sm font-medium rounded-lg border transition-all duration-200 ${
+                isPending || !isLoaded
+                  ? 'border-gray-500/30 text-gray-500 cursor-not-allowed opacity-50'
+                  : running
+                    ? 'border-red-400/40 text-red-400 hover:bg-red-400/10 hover:border-red-400/60'
+                    : 'border-green-400/40 text-green-400 hover:bg-green-400/10 hover:border-green-400/60'
+              }`}
+            >
+              {isPending
+                ? 'Processing...'
                 : running
-                  ? 'border-red-400/40 text-red-400 hover:bg-red-400/10'
-                  : 'border-green-400/40 text-green-400 hover:bg-green-400/10'
-            }`}
-          >
-            {running ? 'Stop Worker' : 'Start Worker'}
-          </button>
+                  ? 'Stop Worker'
+                  : 'Start Worker'}
+            </button>
+          </div>
+
+          {/* Feedback messages */}
+          {error && (
+            <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3">
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+          )}
+          {successMsg && (
+            <div className="rounded-lg bg-green-500/10 border border-green-500/30 px-4 py-3">
+              <p className="text-sm text-green-400">{successMsg}</p>
+            </div>
+          )}
         </div>
-        {startMutation.data && (
-          <p className="text-xs text-(--text-muted) mt-4 font-mono">
-            Queued {startMutation.data.queued} job{startMutation.data.queued === 1 ? '' : 's'} for{' '}
-            {startMutation.data.companyCount} active company{startMutation.data.companyCount === 1 ? '' : 'ies'}.
-          </p>
-        )}
       </GlassCard>
 
-      {/* Mode selection */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {(Object.entries(MODES) as [WorkflowMode, ModeConfig][]).map(([key, config]) => {
-          const isActive = mode === key;
-          return (
-            <button
-              key={key}
-              onClick={() => handleModeChange(key)}
-              className="text-left p-4 rounded-xl border transition-all duration-200"
-              style={{
-                backgroundColor: isActive ? `color-mix(in srgb, ${config.color} 10%, transparent)` : 'var(--bg-card)',
-                borderColor: isActive ? `color-mix(in srgb, ${config.color} 40%, transparent)` : 'var(--border-primary)',
-              }}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <div
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: isActive ? config.color : 'var(--text-muted)' }}
-                />
-                <h4
-                  className="text-sm font-semibold"
-                  style={{ color: isActive ? config.color : 'var(--text-secondary)' }}
+      {/* Mode Selection */}
+      <div>
+        <h3 className="text-sm font-semibold text-(--text-primary) mb-3 uppercase tracking-wider">
+          Generation Mode
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {(Object.entries(MODES) as [WorkflowMode, ModeConfig][]).map(([key, config]) => {
+            const isActive = mode === key;
+            return (
+              <button
+                key={key}
+                onClick={() => handleModeChange(key)}
+                className="relative text-left p-5 rounded-xl border transition-all duration-200 group"
+                style={{
+                  backgroundColor: isActive ? `color-mix(in srgb, ${config.color} 8%, var(--bg-card))` : 'var(--bg-card)',
+                  borderColor: isActive ? `color-mix(in srgb, ${config.color} 50%, transparent)` : 'var(--border-primary)',
+                }}
+              >
+                {isActive && (
+                  <div
+                    className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: config.color }}
+                  />
+                )}
+                <div className="flex items-center gap-2.5 mb-2.5">
+                  <span className="text-lg">{config.icon}</span>
+                  <h4
+                    className="text-sm font-bold"
+                    style={{ color: isActive ? config.color : 'var(--text-secondary)' }}
+                  >
+                    {config.label}
+                  </h4>
+                </div>
+                <p
+                  className="text-xs leading-relaxed"
+                  style={{ color: isActive ? 'var(--text-secondary)' : 'var(--text-muted)' }}
                 >
-                  {config.label}
-                </h4>
-              </div>
-              <p className="text-xs text-(--text-muted) leading-relaxed">
-                {config.description}
-              </p>
-            </button>
-          );
-        })}
+                  {config.description}
+                </p>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Interval (only for scheduled mode) */}
+      {/* Interval Config (only for scheduled) */}
       {mode === 'scheduled' && (
         <GlassCard glow="cyan">
-          <h3 className="text-sm font-semibold text-(--text-primary) mb-3">
+          <h3 className="text-sm font-semibold text-(--text-primary) mb-4 uppercase tracking-wider">
             Generation Interval
           </h3>
           <div className="flex items-center gap-4">
-            <input
-              type="number"
-              value={interval}
-              onChange={(e) => handleIntervalChange(Number(e.target.value))}
-              min={30}
-              step={30}
-              className="w-32 bg-(--bg-primary) border border-(--border-primary) rounded-lg px-3 py-2 text-sm text-(--text-primary) font-mono focus:outline-none focus:border-(--accent-cyan)/50"
-            />
-            <span className="text-xs text-(--text-muted)">
-              seconds ({Math.floor(interval / 60)}m {interval % 60}s)
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={interval}
+                onChange={(e) => handleIntervalChange(Number((e.target as any).value))}
+                min={30}
+                step={30}
+                className="w-28 bg-(--bg-primary) border border-(--border-primary) rounded-lg px-3 py-2 text-sm text-(--text-primary) font-mono focus:outline-none focus:border-(--accent-cyan)/50"
+              />
+              <span className="text-xs text-(--text-muted)">seconds</span>
+            </div>
+            <div className="h-6 w-px bg-(--border-primary)" />
+            <span className="text-sm font-mono" style={{ color: 'var(--accent-cyan)' }}>
+              {Math.floor(interval / 60)}m {interval % 60}s
             </span>
           </div>
         </GlassCard>
       )}
+
+      {/* Help text */}
+      <div className="rounded-xl border border-(--border-primary) bg-(--bg-card)/50 p-5">
+        <h4 className="text-xs font-semibold text-(--text-muted) uppercase tracking-wider mb-3">How it works</h4>
+        <div className="space-y-2 text-xs text-(--text-muted) leading-relaxed">
+          <p>1. Select a generation mode above</p>
+          <p>2. Click <span className="text-green-400 font-medium">Start Worker</span> to begin generating articles</p>
+          <p>3. The worker will queue jobs for each active company</p>
+          <p>4. AI reporters write articles, the CEO agent reviews them</p>
+          <p className="text-(--text-muted)/60 mt-2">
+            Make sure you have at least one active company, reporters, and an AI provider configured.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

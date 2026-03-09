@@ -43,3 +43,4 @@ export { discoverTopics, discoverTopicsForCategories } from './pipelines/topic-p
 export { estimateTokens, estimateCost } from './utils/token-counter';
 export { cosineSimilarity, isDuplicate } from './utils/dedup';
 export { RateLimiter } from './utils/rate-limiter';
+export { fetchNewsForCategories, formatNewsContext, type NewsItem } from './utils/news-fetcher';

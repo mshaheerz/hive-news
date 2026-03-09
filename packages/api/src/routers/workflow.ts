@@ -21,7 +21,7 @@ function getGenerationQueue() {
 
 const workflowModeEnum = z.enum(['scheduled', 'continuous', 'on-demand']);
 
-const upsertSetting = async (ctx: Context, key: string, value: string) => {
+const upsertSetting = async (ctx: Context, key: string, value: unknown) => {
   await ctx.db
     .insert(settings)
     .values({ key, value })
@@ -31,29 +31,29 @@ const upsertSetting = async (ctx: Context, key: string, value: string) => {
     });
 };
 
+/** Read a setting value back as a plain string, handling jsonb wrapping */
+function settingToString(row: { value: unknown } | undefined): string | undefined {
+  if (!row) return undefined;
+  const v = row.value;
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  // jsonb might wrap strings in extra quotes or return objects
+  if (v === null || v === undefined) return undefined;
+  return String(v);
+}
+
 export const workflowRouter = router({
   status: publicProcedure.query(async ({ ctx }) => {
-    const rows = await ctx.db
-      .select()
-      .from(settings)
-      .where(eq(settings.key, 'workflow_running'))
-      .limit(1);
+    const [runningRows, modeRows, intervalRows] = await Promise.all([
+      ctx.db.select().from(settings).where(eq(settings.key, 'workflow_running')).limit(1),
+      ctx.db.select().from(settings).where(eq(settings.key, 'workflow_mode')).limit(1),
+      ctx.db.select().from(settings).where(eq(settings.key, 'workflow_interval')).limit(1),
+    ]);
 
-    const modeRow = await ctx.db
-      .select()
-      .from(settings)
-      .where(eq(settings.key, 'workflow_mode'))
-      .limit(1);
-
-    const intervalRow = await ctx.db
-      .select()
-      .from(settings)
-      .where(eq(settings.key, 'workflow_interval'))
-      .limit(1);
-
-    const running = rows[0] ? rows[0].value === 'true' : true;
-    const mode = (modeRow[0]?.value as string | undefined) ?? 'scheduled';
-    const interval = intervalRow[0] ? Number(intervalRow[0].value) || 300 : 300;
+    const runningVal = settingToString(runningRows[0]);
+    const running = runningVal === 'true';
+    const mode = settingToString(modeRows[0]) ?? 'scheduled';
+    const interval = Number(settingToString(intervalRows[0])) || 300;
 
     return { running, mode, interval };
   }),

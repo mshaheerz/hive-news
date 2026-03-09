@@ -23,13 +23,36 @@ function StatCard({ label, value, color }: { label: string; value: string | numb
   );
 }
 
+const EVENT_COLORS: Record<string, string> = {
+  'article-generated': '#22c55e',
+  'article-approved': '#22c55e',
+  'article-rejected': '#ef4444',
+  'article-published': 'var(--accent-cyan)',
+  'topic-selected': '#f59e0b',
+  'generation-started': '#3b82f6',
+  'generation-completed': '#22c55e',
+  'review-started': '#a855f7',
+  'error': '#ef4444',
+};
+
+function getEventColor(event: string): string {
+  return EVENT_COLORS[event] ?? 'var(--text-muted)';
+}
+
+function formatEventLabel(event: string): string {
+  return event
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export default function DashboardPage() {
   const { data } = trpc.dashboard.stats.useQuery();
-  const { data: logsData = [], isLoading: logsLoading } = trpc.dashboard.logs.useQuery({ limit: 8 });
+  const { data: logsData = [], isLoading: logsLoading } = trpc.dashboard.logs.useQuery({ limit: 12 });
   const { data: reviewEntries = [], isLoading: reviewLoading } = trpc.dashboard.reviewLogs.useQuery({
     limit: 5,
     action: 'rejected',
   });
+  const { data: recentArticlesData, isLoading: articlesLoading } = trpc.articles.getLatest.useQuery({ count: 5 });
 
   const stats = {
     totalArticles: data?.articles.total ?? 0,
@@ -41,8 +64,11 @@ export default function DashboardPage() {
   };
 
   const logEntries = logsData;
-  const formatTimestamp = (value?: string) =>
-    value ? new Date(value).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
+  const formatTimestamp = (value?: string | Date | null) => {
+    if (!value) return '';
+    const d = typeof value === 'string' ? new Date(value) : value;
+    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
 
   return (
     <main className="max-w-6xl mx-auto px-4 py-8">
@@ -60,34 +86,14 @@ export default function DashboardPage() {
       </header>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
         <StatCard label="Total Articles" value={stats.totalArticles} color="var(--accent-cyan)" />
         <StatCard label="Published" value={stats.publishedArticles} color="#22c55e" />
         <StatCard label="Approved" value={stats.approvedArticles} color="var(--accent-purple)" />
-        <StatCard label="Active Reporters" value={stats.activeReporters} color="var(--accent-purple)" />
+        <StatCard label="Reporters" value={stats.activeReporters} color="var(--accent-purple)" />
         <StatCard label="Companies" value={stats.companies} color="#0ea5e9" />
-        <StatCard label="Tokens Used" value={stats.tokensUsed.toLocaleString()} color="#f59e0b" />
+        <StatCard label="Tokens" value={stats.tokensUsed.toLocaleString()} color="#f59e0b" />
       </div>
-
-      {/* Agent status */}
-      <section className="mb-8">
-        <h2 className="text-lg font-semibold text-(--text-primary) mb-4">Agent Status</h2>
-        <div className="glass-card p-6 rounded-xl border border-(--border-primary)">
-          <div className="space-y-3">
-            {['Editor-in-Chief', 'Research Agent', 'Writer Agent', 'Fact-Check Agent', 'Publisher Agent'].map(
-              (agent) => (
-                <div key={agent} className="flex items-center justify-between py-2 border-b border-(--border-primary) last:border-0">
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-(--text-muted)" />
-                    <span className="text-sm text-(--text-secondary)">{agent}</span>
-                  </div>
-                  <span className="text-xs text-(--text-muted) font-mono">Idle</span>
-                </div>
-              )
-            )}
-          </div>
-        </div>
-      </section>
 
       {/* Agent Flow Visualization */}
       <section className="mb-8">
@@ -97,104 +103,204 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section className="mb-8">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="text-lg font-semibold text-(--text-primary)">Workflow Activity</h2>
-            <p className="text-xs text-(--text-muted)">Live logs from the worker</p>
+      {/* Two-column layout: Logs + Rejections */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
+        {/* Workflow Activity Logs - wider column */}
+        <section className="lg:col-span-3">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-lg font-semibold text-(--text-primary)">Activity Log</h2>
+              <p className="text-xs text-(--text-muted)">Live workflow events</p>
+            </div>
+            <span className="text-xs font-mono text-(--text-muted) bg-(--bg-secondary) px-2 py-1 rounded">
+              {logsLoading ? '...' : `${logEntries.length}`}
+            </span>
           </div>
-          <span className="text-xs text-(--text-muted)">
-            {logsLoading ? 'Loading…' : `${logEntries.length} entries`}
-          </span>
-        </div>
-          <div className="glass-card p-4 rounded-xl border border-(--border-primary)">
+          <div className="glass-card rounded-xl border border-(--border-primary) overflow-hidden">
             {logsLoading ? (
-              <p className="text-sm text-(--text-muted)">Loading events…</p>
+              <div className="p-6">
+                <p className="text-sm text-(--text-muted)">Loading events...</p>
+              </div>
             ) : logEntries.length === 0 ? (
-              <p className="text-sm text-(--text-muted)">No workflow activity recorded yet</p>
+              <div className="p-6 text-center">
+                <p className="text-sm text-(--text-muted)">No workflow activity yet</p>
+                <p className="text-xs text-(--text-muted)/60 mt-1">Start the workflow to see events here</p>
+              </div>
             ) : (
-            <div className="space-y-3">
-              {logEntries.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="rounded-xl border border-(--border-primary) bg-(--bg-secondary)/40 px-4 py-3"
-                >
-                  <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                    <span>
-                      {entry.companyName}
-                      {entry.reporterName ? ` · ${entry.reporterName}` : ''}
-                    </span>
-                    <span>{formatTimestamp(entry.createdAt)}</span>
-                  </div>
-                  <p className="text-sm font-medium text-(--text-secondary) mt-1">{entry.message}</p>
-                  <div className="flex flex-wrap gap-2 mt-2 text-[11px] text-(--text-muted)">
-                    <span className="rounded-full bg-(--border-primary)/40 px-2 py-1">{entry.event}</span>
-                    {entry.metadata &&
-                      Object.entries(entry.metadata).map(([key, value]) => (
-                        <span key={key}>{`${key}: ${String(value)}`}</span>
-                      ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="mb-8">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="text-lg font-semibold text-(--text-primary)">Review Rejections</h2>
-            <p className="text-xs text-(--text-muted)">Latest CEO rejection decisions</p>
+              <div className="divide-y divide-(--border-primary)/50">
+                {logEntries.map((entry) => {
+                  const eventColor = getEventColor(entry.event);
+                  return (
+                    <div key={entry.id} className="px-4 py-3 hover:bg-(--bg-secondary)/30 transition-colors">
+                      {/* Top row: event badge + timestamp */}
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ backgroundColor: eventColor }}
+                          />
+                          <span
+                            className="text-[11px] font-semibold uppercase tracking-wider"
+                            style={{ color: eventColor }}
+                          >
+                            {formatEventLabel(entry.event)}
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-mono text-(--text-muted)/60">
+                          {formatTimestamp(entry.createdAt)}
+                        </span>
+                      </div>
+                      {/* Message */}
+                      <p className="text-sm text-(--text-secondary) leading-snug">
+                        {entry.message}
+                      </p>
+                      {/* Source info */}
+                      <div className="flex items-center gap-2 mt-1.5 text-[11px] text-(--text-muted)/70">
+                        {entry.companyName && (
+                          <span className="bg-(--bg-secondary) px-1.5 py-0.5 rounded">
+                            {entry.companyName}
+                          </span>
+                        )}
+                        {entry.reporterName && (
+                          <span className="bg-(--bg-secondary) px-1.5 py-0.5 rounded">
+                            {entry.reporterName}
+                          </span>
+                        )}
+                        {entry.metadata &&
+                          Object.entries(entry.metadata)
+                            .slice(0, 3)
+                            .map(([key, value]) => (
+                              <span key={key} className="bg-(--bg-secondary) px-1.5 py-0.5 rounded">
+                                {key}: {String(value)}
+                              </span>
+                            ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          <span className="text-xs text-(--text-muted)">
-            {reviewLoading ? 'Loading…' : `${reviewEntries.length} entries`}
-          </span>
-        </div>
-        <div className="glass-card p-4 rounded-xl border border-(--border-primary)">
-          {reviewLoading ? (
-            <p className="text-sm text-(--text-muted)">Loading review logs…</p>
-          ) : reviewEntries.length === 0 ? (
-            <p className="text-sm text-(--text-muted)">No review rejections yet</p>
-          ) : (
-            <div className="space-y-3">
-              {reviewEntries.map((entry) => (
-                <div key={entry.id} className="rounded-xl border border-(--border-primary) bg-(--bg-secondary)/40 px-4 py-3">
-                  <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                    <span>
-                      {entry.articleTitle} · {entry.companyName}
-                    </span>
-                    <span>{new Date(entry.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
-                  </div>
-                  <p className="text-sm font-semibold text-red-400 mt-1">Rejected by {entry.reviewerName}</p>
-                  <p className="text-sm text-(--text-muted) mt-2">
-                    {entry.feedback ?? 'No feedback provided'}
-                  </p>
-                  {entry.score != null && (
-                    <p className="text-[11px] text-(--text-muted) mt-2">Score: {entry.score}</p>
-                  )}
-                </div>
-              ))}
+        </section>
+
+        {/* Review Rejections - narrower column */}
+        <section className="lg:col-span-2">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-lg font-semibold text-(--text-primary)">Rejections</h2>
+              <p className="text-xs text-(--text-muted)">CEO review decisions</p>
             </div>
-          )}
-        </div>
-      </section>
+            <span className="text-xs font-mono text-(--text-muted) bg-(--bg-secondary) px-2 py-1 rounded">
+              {reviewLoading ? '...' : `${reviewEntries.length}`}
+            </span>
+          </div>
+          <div className="glass-card rounded-xl border border-(--border-primary) overflow-hidden">
+            {reviewLoading ? (
+              <div className="p-6">
+                <p className="text-sm text-(--text-muted)">Loading...</p>
+              </div>
+            ) : reviewEntries.length === 0 ? (
+              <div className="p-6 text-center">
+                <p className="text-sm text-(--text-muted)">No rejections yet</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-(--border-primary)/50">
+                {reviewEntries.map((entry) => (
+                  <div key={entry.id} className="px-4 py-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] font-mono text-(--text-muted)/60">
+                        {entry.createdAt ? new Date(entry.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </span>
+                      {entry.score != null && (
+                        <span className="text-[11px] font-mono text-red-400/80 bg-red-400/10 px-1.5 py-0.5 rounded">
+                          Score: {entry.score}/10
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm font-medium text-(--text-secondary) leading-snug truncate">
+                      {entry.articleTitle}
+                    </p>
+                    <p className="text-[11px] text-red-400/80 mt-1">
+                      Rejected by {entry.reviewerName}
+                    </p>
+                    {entry.feedback && (
+                      <p className="text-xs text-(--text-muted) mt-1.5 line-clamp-2 leading-relaxed">
+                        {entry.feedback}
+                      </p>
+                    )}
+                    {entry.companyName && (
+                      <span className="inline-block text-[10px] text-(--text-muted)/60 bg-(--bg-secondary) px-1.5 py-0.5 rounded mt-1.5">
+                        {entry.companyName}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
 
       {/* Recent articles */}
-      <section>
-        <h2 className="text-lg font-semibold text-(--text-primary) mb-4">Recent Articles</h2>
-        <div className="glass-card p-6 rounded-xl border border-(--border-primary)">
-          <div className="text-center py-8">
-            <p className="text-sm text-(--text-muted)">No articles published yet</p>
-            <p className="text-xs text-(--text-muted) mt-1">Start the workflow to generate articles</p>
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-lg font-semibold text-(--text-primary)">Recent Articles</h2>
+            <p className="text-xs text-(--text-muted)">Latest published articles</p>
           </div>
+          <span className="text-xs font-mono text-(--text-muted) bg-(--bg-secondary) px-2 py-1 rounded">
+            {articlesLoading ? '...' : `${recentArticlesData?.length ?? 0}`}
+          </span>
+        </div>
+        <div className="glass-card rounded-xl border border-(--border-primary) overflow-hidden">
+          {articlesLoading ? (
+            <div className="p-6">
+              <p className="text-sm text-(--text-muted)">Loading articles...</p>
+            </div>
+          ) : !recentArticlesData || recentArticlesData.length === 0 ? (
+            <div className="p-6 text-center">
+              <p className="text-sm text-(--text-muted)">No articles published yet</p>
+              <p className="text-xs text-(--text-muted)/60 mt-1">Start the workflow to generate articles</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-(--border-primary)/50">
+              {recentArticlesData.map((article) => (
+                <Link
+                  key={article.id}
+                  href={`/article/${article.slug}`}
+                  className="block px-4 py-3 hover:bg-(--bg-secondary)/30 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-(--accent-cyan)">
+                      {article.status}
+                    </span>
+                    <span className="text-[11px] font-mono text-(--text-muted)/60">
+                      {article.publishedAt
+                        ? new Date(article.publishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        : article.createdAt
+                          ? new Date(article.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                          : ''}
+                    </span>
+                  </div>
+                  <p className="text-sm font-medium text-(--text-secondary) leading-snug truncate">
+                    {article.title}
+                  </p>
+                  {article.summary && (
+                    <p className="text-xs text-(--text-muted) mt-1 line-clamp-1">
+                      {article.summary}
+                    </p>
+                  )}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
       {/* Quick nav to settings */}
-      <section className="mt-8">
+      <section>
         <h2 className="text-lg font-semibold text-(--text-primary) mb-4">Settings</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
           {[
             { label: 'AI Providers', href: '/settings/providers', color: 'var(--accent-cyan)' },
             { label: 'Companies', href: '/settings/companies', color: 'var(--accent-purple)' },
@@ -206,12 +312,14 @@ export default function DashboardPage() {
               key={item.href}
               href={item.href}
               className="glass-card p-4 rounded-xl border border-(--border-primary) hover:border-opacity-50 transition-all duration-200 group"
-              style={{ '--hover-color': item.color } as React.CSSProperties}
             >
-              <span className="text-sm font-medium text-(--text-secondary) group-hover:text-(--text-primary) transition-colors">
+              <span
+                className="text-sm font-medium transition-colors"
+                style={{ color: item.color }}
+              >
                 {item.label}
               </span>
-              <span className="block text-xs text-(--text-muted) mt-1 font-mono">&rarr; Configure</span>
+              <span className="block text-xs text-(--text-muted) mt-1 font-mono">&rarr;</span>
             </Link>
           ))}
         </div>

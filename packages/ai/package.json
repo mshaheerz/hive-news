@@ -8,13 +8,14 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "ai": "^4.1.0",
-    "@ai-sdk/openai": "^1.2.0",
     "@ai-sdk/anthropic": "^1.2.0",
     "@ai-sdk/google": "^1.2.0",
-    "zod": "^3.24.0",
+    "@ai-sdk/openai": "^1.2.0",
+    "@jaurnalist/db": "workspace:*",
     "@jaurnalist/shared": "workspace:*",
-    "@jaurnalist/db": "workspace:*"
+    "ai": "^4.1.0",
+    "fast-xml-parser": "^5.4.2",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

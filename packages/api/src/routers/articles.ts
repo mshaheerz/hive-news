@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { eq, desc, and, sql, like } from 'drizzle-orm';
+import { eq, desc, and, sql, like, inArray } from 'drizzle-orm';
 import { router, publicProcedure } from '../trpc';
 import { articles, reporters } from '@jaurnalist/db/schema';
 
@@ -91,7 +91,7 @@ export const articlesRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const conditions = [eq(articles.status, 'published')];
+      const conditions = [inArray(articles.status, ['published', 'approved'])];
 
       if (input.companyId) {
         conditions.push(eq(articles.companyId, input.companyId));
@@ -101,7 +101,7 @@ export const articlesRouter = router({
         .select()
         .from(articles)
         .where(and(...conditions))
-        .orderBy(desc(articles.publishedAt))
+        .orderBy(desc(articles.publishedAt), desc(articles.createdAt))
         .limit(input.count);
     }),
 

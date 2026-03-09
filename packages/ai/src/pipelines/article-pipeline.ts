@@ -5,6 +5,7 @@ import { CEOAgent, type TopicAssignment, type ReviewResult } from '../agents/ceo
 import { ReporterAgent, type ArticleOutput } from '../agents/reporter-agent';
 import { isDuplicate } from '../utils/dedup';
 import { RateLimiter } from '../utils/rate-limiter';
+import { fetchNewsForCategories, formatNewsContext, type NewsItem } from '../utils/news-fetcher';
 
 export interface GeneratedArticle {
   topic: TopicAssignment;
@@ -12,6 +13,7 @@ export interface GeneratedArticle {
   review: ReviewResult | null;
   reporterId: string;
   status: ArticleStatus;
+  sourceUrl?: string;
   error?: string;
 }
 
@@ -63,17 +65,22 @@ export class ArticlePipeline {
   async runCycle(companyData: CompanyData): Promise<GeneratedArticle[]> {
     const { reporters, categories, recentTitles, recentEmbeddings } = companyData;
 
-    // 1. Create CEO agent
+    // 1. Fetch real news from RSS feeds
+    const newsItems = await fetchNewsForCategories(categories);
+    const newsContext = formatNewsContext(newsItems);
+
+    // 2. Create CEO agent
     const ceoModel = this.registry.getModel(companyData.ceoProviderId, companyData.ceoModelId);
     const ceoAgent = new CEOAgent(ceoModel, companyData.ceoSystemPrompt);
 
-    // 2. CEO selects topics
+    // 3. CEO selects topics (with real news context)
     const topicCount = Math.min(reporters.length, 5);
     await this.rateLimiter.acquire();
     const topics = await ceoAgent.selectTopics({
       categories,
       recentTitles,
       count: topicCount,
+      newsContext: newsContext || undefined,
     });
 
     // 3. Assign reporters by category match
@@ -91,20 +98,25 @@ export class ArticlePipeline {
           const reporterModel = this.registry.getModel(reporter.providerId, reporter.modelId);
           const reporterAgent = new ReporterAgent(reporterModel, reporter.systemPrompt);
 
+          // Extract source URL from briefing if present
+          const urlMatch = topic.briefing?.match(/https?:\/\/[^\s)]+/);
+          const sourceUrl = urlMatch?.[0];
+
           const article = await reporterAgent.execute({
             topic: topic.topic,
             category: topic.category,
             targetLength: this.config.targetArticleLength,
             briefing: topic.briefing,
+            sourceUrl,
           });
 
-          return { topic, reporter, article };
+          return { topic, reporter, article, sourceUrl: article.sourceUrl ?? sourceUrl };
         }),
       );
 
       for (const result of chunkResults) {
         if (result.status === 'fulfilled') {
-          const { topic, reporter, article } = result.value;
+          const { topic, reporter, article, sourceUrl } = result.value;
 
           // 5. Check duplicates (placeholder - would use embeddings in production)
           // For now, we skip embedding-based dedup if no embeddings are available
@@ -124,6 +136,7 @@ export class ArticlePipeline {
             review,
             reporterId: reporter.id,
             status,
+            sourceUrl,
           });
         } else {
           const assignment = chunk[chunkResults.indexOf(result)];

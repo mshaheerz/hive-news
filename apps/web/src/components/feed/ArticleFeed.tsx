@@ -29,6 +29,7 @@ interface Article {
 
 interface ArticleFeedProps {
   initialArticles?: Article[];
+  categorySlug?: string;
 }
 
 function ArticleSkeleton() {
@@ -46,7 +47,7 @@ function ArticleSkeleton() {
   );
 }
 
-export function ArticleFeed({ initialArticles }: ArticleFeedProps) {
+export function ArticleFeed({ initialArticles, categorySlug }: ArticleFeedProps) {
   const [articles, setArticles] = useState<Article[]>(initialArticles ?? []);
   const [loading, setLoading] = useState(!initialArticles);
 
@@ -70,7 +71,9 @@ export function ArticleFeed({ initialArticles }: ArticleFeedProps) {
 
     async function fetchArticles() {
       try {
-        const res = await fetch('/api/v1/articles?limit=20&status=published');
+        const params = new URLSearchParams({ limit: '20', status: 'published' });
+        if (categorySlug) params.set('category', categorySlug);
+        const res = await fetch(`/api/v1/articles?${params}`);
         if (res.ok) {
           const data = await res.json();
           setArticles(data.articles ?? []);
@@ -83,7 +86,7 @@ export function ArticleFeed({ initialArticles }: ArticleFeedProps) {
     }
 
     fetchArticles();
-  }, [initialArticles]);
+  }, [initialArticles, categorySlug]);
 
   if (loading) {
     return (
